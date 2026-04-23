@@ -12,6 +12,8 @@
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
+    "@electron-toolkit/preload": "^3.0.1",
+    "@electron-toolkit/utils": "^3.0.0",
     "@headlessui/react": "^2.0.0",
     "clsx": "^2.1.1",
     "framer-motion": "^11.2.10",
@@ -22,7 +24,6 @@
     "zustand": "^4.5.2"
   },
   "devDependencies": {
-    "@electron-vite/cli": "^2.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "electron": "^31.0.1",
     "electron-builder": "^24.13.3",

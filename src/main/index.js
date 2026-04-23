@@ -3,6 +3,8 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
+import { detectHardware, transcribe } from './engine/transcription'
+
 function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 1100,
@@ -14,7 +16,7 @@ function createWindow() {
       preload: join(__dirname, '../preload/index.mjs'),
       sandbox: false
     },
-    frame: false, // Custom frame for premium look
+    frame: false,
     transparent: true,
     backgroundColor: '#00000000'
   })
@@ -33,10 +35,35 @@ function createWindow() {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  // Handle transcription request
+  ipcMain.handle('start-transcription', async (event, { filePath, options }) => {
+    try {
+      const result = await transcribe(
+        filePath,
+        options,
+        (progress) => {
+          mainWindow.webContents.send('transcription-progress', progress)
+        },
+        (data) => {
+          mainWindow.webContents.send('transcription-data', data)
+        }
+      )
+      return result
+    } catch (error) {
+      console.error('Transcription Error:', error)
+      throw error
+    }
+  })
+
+  // Handle hardware detection
+  ipcMain.handle('detect-hardware', async () => {
+    return await detectHardware()
+  })
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppId('com.voicext.app')
+  electronApp.setAppUserModelId('com.voicext.app')
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
