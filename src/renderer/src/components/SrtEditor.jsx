@@ -57,34 +57,17 @@ const SrtEditor = ({ filePath, onClose }) => {
     }).join('\n\n') + '\n'
   }
 
+  const [showToast, setShowToast] = useState(false)
+
   const handleSave = async () => {
     setSaving(true)
     try {
       const content = stringifySrt(segments)
       await window.api.saveSrt(filePath, content)
-      // Show some success feedback
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 3000)
     } catch (error) {
       alert('Error saving SRT: ' + error.message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleOptimize = async () => {
-    setSaving(true)
-    try {
-      // First save current state
-      const currentContent = stringifySrt(segments)
-      await window.api.saveSrt(filePath, currentContent)
-      
-      // Then optimize
-      const result = await window.api.optimizeSrt(filePath)
-      if (result.success) {
-        const parsed = parseSrt(result.content)
-        setSegments(parsed)
-      }
-    } catch (error) {
-      alert('Error optimizing SRT: ' + error.message)
     } finally {
       setSaving(false)
     }
@@ -95,7 +78,7 @@ const SrtEditor = ({ filePath, onClose }) => {
   }
 
   const handleKeyDown = (e) => {
-    if (e.shiftKey && e.key === 'S') {
+    if ((e.ctrlKey || e.metaKey || e.shiftKey) && e.key.toLowerCase() === 's') {
       e.preventDefault()
       handleSave()
     }
@@ -110,6 +93,20 @@ const SrtEditor = ({ filePath, onClose }) => {
 
   return (
     <div className="srt-editor-container glass">
+      <AnimatePresence>
+        {showToast && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: 20, x: '-50%' }}
+            className="save-toast"
+          >
+            <CheckCircle size={18} />
+            SRT Saved Successfully!
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="editor-header">
         <button className="btn-back" onClick={onClose}>
           <ArrowLeft size={18} />
@@ -183,25 +180,13 @@ const SrtEditor = ({ filePath, onClose }) => {
       </div>
 
       <div className="editor-footer">
-        <div className="footer-actions-left">
-           <button className="btn-footer-secondary" onClick={handleSave} disabled={saving}>
-             <Save size={16} />
-             {saving ? 'SAVING...' : 'SAVE CORRECTIONS (Shift+S)'}
-           </button>
-           <button className="btn-footer-secondary">
-             <Download size={16} />
-             EXPORT FINISHED SRT
-             <span className="btn-subtext">(Premiere Compatible)</span>
-           </button>
-        </div>
-
-        <button className="btn-one-click-export" onClick={handleOptimize} disabled={saving}>
+        <button className="btn-one-click-export" style={{ maxWidth: '100%' }} onClick={handleSave} disabled={saving}>
           <div className="btn-content">
-             <span className="main-text">PREMIERE ONE-CLICK OPTIMIZED EXPORT</span>
-             <span className="sub-text">(Standartlara En Uygun Format - UTF-8)</span>
+             <span className="main-text">{saving ? 'SAVING...' : 'SAVE ALL CHANGES'}</span>
+             <span className="sub-text">(Ctrl + S to save instantly)</span>
           </div>
           <div className="btn-icon">
-            <Zap size={24} fill="currentColor" />
+            <Save size={24} />
           </div>
         </button>
       </div>

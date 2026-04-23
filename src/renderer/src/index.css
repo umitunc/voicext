@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
 :root {
   --bg-color: #0b0c14;
@@ -914,40 +914,7 @@ body {
   border-top: 1px solid var(--glass-border);
 }
 
-.footer-actions-left {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
 
-.btn-footer-secondary {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--glass-border);
-  border-radius: 12px;
-  padding: 10px 20px;
-  color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  transition: all 0.2s;
-  text-align: left;
-}
-
-.btn-footer-secondary:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: white;
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-.btn-subtext {
-  font-size: 10px;
-  opacity: 0.6;
-  font-weight: 400;
-  display: block;
-}
 
 .btn-one-click-export {
   flex: 1;
@@ -1003,4 +970,21 @@ body {
   height: 100%;
   font-size: 20px;
   color: var(--primary-cyan);
+}
+.save-toast {
+  position: absolute;
+  bottom: 120px;
+  left: 50%;
+  background: rgba(0, 242, 255, 0.95);
+  color: #0b0c14;
+  padding: 12px 24px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  z-index: 100;
+  box-shadow: 0 10px 30px rgba(0, 242, 255, 0.4);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
