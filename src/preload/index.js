@@ -7,7 +7,11 @@ const api = {
   onTranscriptionProgress: (callback) => ipcRenderer.on('transcription-progress', (_, progress) => callback(progress)),
   onTranscriptionData: (callback) => ipcRenderer.on('transcription-data', (_, data) => callback(data)),
   detectHardware: () => ipcRenderer.invoke('detect-hardware'),
-  openExplorer: (path) => ipcRenderer.send('open-explorer', path)
+  openExplorer: (path) => ipcRenderer.send('open-explorer', path),
+  readSrt: (filePath) => ipcRenderer.invoke('read-srt', filePath),
+  saveSrt: (filePath, content) => ipcRenderer.invoke('save-srt', { filePath, content }),
+  selectFile: (filters) => ipcRenderer.invoke('select-file', filters),
+  optimizeSrt: (filePath) => ipcRenderer.invoke('optimize-srt', filePath)
 }
 
 if (process.contextIsolated) {

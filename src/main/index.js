@@ -1,9 +1,10 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
+import fs from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
-import { detectHardware, transcribe } from './engine/transcription'
+import { detectHardware, transcribe, fixSrt } from './engine/transcription'
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -75,6 +76,52 @@ function createWindow() {
 
   ipcMain.on('open-explorer', (event, path) => {
     shell.showItemInFolder(path)
+  })
+
+  // Handle SRT Reading
+  ipcMain.handle('read-srt', async (event, filePath) => {
+    try {
+      const content = fs.readFileSync(filePath, 'utf-8')
+      return content
+    } catch (error) {
+      console.error('Read SRT Error:', error)
+      throw error
+    }
+  })
+
+  // Handle SRT Saving
+  ipcMain.handle('save-srt', async (event, { filePath, content }) => {
+    try {
+      fs.writeFileSync(filePath, content, 'utf-8')
+      return { success: true }
+    } catch (error) {
+      console.error('Save SRT Error:', error)
+      throw error
+    }
+  })
+
+  // Handle File Dialog
+  ipcMain.handle('select-file', async (event, filters) => {
+    const { dialog } = require('electron')
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: filters || []
+    })
+    if (result.canceled) return null
+    return result.filePaths[0]
+  })
+
+  // Handle SRT Optimization
+  ipcMain.handle('optimize-srt', async (event, filePath) => {
+    try {
+      const content = fs.readFileSync(filePath, 'utf-8')
+      const optimized = fixSrt(content)
+      fs.writeFileSync(filePath, optimized, 'utf-8')
+      return { success: true, content: optimized }
+    } catch (error) {
+      console.error('Optimize SRT Error:', error)
+      throw error
+    }
   })
 }
 

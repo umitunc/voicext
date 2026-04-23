@@ -2,7 +2,7 @@
 
 Voicext is a high-performance desktop application built with **Electron** and **React** that provides local, private, and fast speech-to-text transcription. It leverages the power of GPU-accelerated AI to convert audio files into professional subtitle formats.
 
-![Voicext Logo](resources/icon.png)
+![Voicext Logo](docs/logo/voicext-logo.png)
 
 ## 🚀 Features
 

@@ -18,6 +18,7 @@ import logo from './assets/logo.png'
 
 import CustomSelect from './components/CustomSelect'
 import ResultModal from './components/ResultModal'
+import SrtEditor from './components/SrtEditor'
 
 const languages = [
   { id: 'auto', name: 'AUTO (Recommended)' },
@@ -51,6 +52,7 @@ function App() {
     format: 'srt'
   })
   const [showResult, setShowResult] = useState(null)
+  const [selectedSrt, setSelectedSrt] = useState(null)
 
   useEffect(() => {
     if (!window.api) {
@@ -117,6 +119,14 @@ function App() {
       alert('Error: ' + error.message)
     } finally {
       setIsTranscribing(false)
+    }
+  }
+
+  const handleSelectSrt = async () => {
+    const filters = [{ name: 'Subtitle Files', extensions: ['srt'] }]
+    const path = await window.api.selectFile(filters)
+    if (path) {
+      setSelectedSrt(path)
     }
   }
 
@@ -296,6 +306,35 @@ function App() {
               </div>
             </motion.div>
           )}
+
+          {activeTab === 'queue' && (
+            <motion.div
+              key="queue"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.05 }}
+              className="queue-view"
+              style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
+            >
+              {selectedSrt ? (
+                <SrtEditor filePath={selectedSrt} onClose={() => setSelectedSrt(null)} />
+              ) : (
+                <div className="queue-empty glass" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
+                  <div className="drop-icon-container">
+                    <div className="drop-icon-bg"></div>
+                    <ListMusic size={80} color="white" style={{ position: 'relative', zIndex: 1 }} />
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <h2>SRT EDITOR & QUEUE</h2>
+                    <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>Select an SRT file to fix timestamps and edit text.</p>
+                    <button className="btn-primary" style={{ maxWidth: '300px', margin: '0 auto' }} onClick={handleSelectSrt}>
+                      Browse SRT Files
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
 
@@ -318,6 +357,10 @@ function App() {
         isOpen={!!showResult} 
         path={showResult} 
         onClose={() => setShowResult(null)} 
+        onEdit={(path) => {
+          setSelectedSrt(path)
+          setActiveTab('queue')
+        }}
       />
     </div>
   )

@@ -1,8 +1,8 @@
 import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle2, FolderOpen, X } from 'lucide-react'
+import { CheckCircle2, FolderOpen, X, FileEdit } from 'lucide-react'
 
-export default function ResultModal({ isOpen, path, onClose }) {
+export default function ResultModal({ isOpen, path, onClose, onEdit }) {
   const handleOpenFolder = () => {
     if (window.api && window.api.openExplorer) {
       window.api.openExplorer(path)
@@ -45,6 +45,12 @@ export default function ResultModal({ isOpen, path, onClose }) {
                   <FolderOpen size={18} />
                   OPEN FOLDER
                 </button>
+                {path && path.toLowerCase().endsWith('.srt') && (
+                  <button className="btn-primary-small" onClick={() => { onEdit(path); onClose(); }}>
+                    <FileEdit size={18} />
+                    EDIT
+                  </button>
+                )}
               </div>
             </div>
           </motion.div>
