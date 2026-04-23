@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { 
   LayoutDashboard, 
   Box, 
@@ -22,6 +22,20 @@ function App() {
   const [file, setFile] = useState(null)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [progress, setProgress] = useState(0)
+  const [hardware, setHardware] = useState({ gpu: false, name: 'Detecting...' })
+  const [config, setConfig] = useState({
+    language: 'tr',
+    model: 'base',
+    format: 'srt'
+  })
+
+  useEffect(() => {
+    window.api.detectHardware().then(setHardware)
+    
+    window.api.onTranscriptionProgress((p) => {
+      setProgress(p)
+    })
+  }, [])
 
   const handleControl = (action) => {
     window.api.windowControls(action)
@@ -42,7 +56,9 @@ function App() {
     e.stopPropagation()
     setDragActive(false)
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFile(e.dataTransfer.files[0])
+      const f = e.dataTransfer.files[0]
+      // In Electron, we can get the real path
+      setFile({ name: f.name, path: f.path || f.name })
     }
   }
 
@@ -52,30 +68,28 @@ function App() {
     input.accept = '.mp3,.wav,.m4a'
     input.onchange = (e) => {
       if (e.target.files && e.target.files[0]) {
-        setFile(e.target.files[0])
+        const f = e.target.files[0]
+        setFile({ name: f.name, path: f.path || f.name })
       }
     }
     input.click()
   }
 
-  const startTranscription = () => {
+  const startTranscription = async () => {
     if (!file) return
     setIsTranscribing(true)
-    // Mock progress for now
-    let p = 0
-    const interval = setInterval(() => {
-      p += Math.random() * 5
-      if (p >= 100) {
-        p = 100
-        clearInterval(interval)
-        setTimeout(() => {
-          setIsTranscribing(false)
-          setProgress(0)
-          alert('Transcription Complete!')
-        }, 1000)
+    setProgress(0)
+    
+    try {
+      const result = await window.api.startTranscription(file.path, config)
+      if (result.success) {
+        alert('Transcription Complete! Output: ' + result.outputPath)
       }
-      setProgress(p)
-    }, 200)
+    } catch (error) {
+      alert('Error: ' + error.message)
+    } finally {
+      setIsTranscribing(false)
+    }
   }
 
   return (
