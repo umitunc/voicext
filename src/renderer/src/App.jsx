@@ -314,7 +314,7 @@ function App() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 1.05 }}
               className="queue-view"
-              style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
+              style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}
             >
               {selectedSrt ? (
                 <SrtEditor filePath={selectedSrt} onClose={() => setSelectedSrt(null)} />
