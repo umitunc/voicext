@@ -10,11 +10,9 @@ export default function CustomSelect({ value, onChange, options, label }) {
       {label && <label>{label}</label>}
       <Listbox value={value} onChange={onChange}>
         <div className="relative mt-1">
-          <Listbox.Button className="select-custom text-left flex justify-between items-center w-full">
+          <Listbox.Button className="select-custom text-left w-full">
             <span className="block truncate">{selectedOption.name}</span>
-            <span className="pointer-events-none">
-              <ChevronDown className="h-4 w-4 text-muted" aria-hidden="true" />
-            </span>
+            <ChevronDown className="h-4 w-4 text-muted pointer-events-none" aria-hidden="true" />
           </Listbox.Button>
           <Transition
             as={Fragment}
@@ -22,7 +20,7 @@ export default function CustomSelect({ value, onChange, options, label }) {
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <Listbox.Options className="absolute z-50 mt-1 max-height-60 w-full overflow-auto rounded-md bg-dark-glass py-1 text-base shadow-lg ring-1 ring-white/10 focus:outline-none sm:text-sm backdrop-blur-xl border border-white/10">
+            <Listbox.Options className="absolute z-50 mt-1 max-height-60 w-full overflow-auto bg-dark-glass py-1 focus:outline-none shadow-lg">
               {options.map((option) => (
                 <Listbox.Option
                   key={option.id}
@@ -33,7 +31,7 @@ export default function CustomSelect({ value, onChange, options, label }) {
                   }
                   value={option.id}
                 >
-                  {({ selected, active }) => (
+                  {({ selected }) => (
                     <>
                       <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
                         {option.name}
