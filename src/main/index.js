@@ -72,6 +72,10 @@ function createWindow() {
     if (action === 'maximize') win.isMaximized() ? win.unmaximize() : win.maximize()
     if (action === 'close') win.close()
   })
+
+  ipcMain.on('open-explorer', (event, path) => {
+    shell.showItemInFolder(path)
+  })
 }
 
 app.whenReady().then(() => {

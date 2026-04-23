@@ -6,7 +6,8 @@ const api = {
   startTranscription: (filePath, options) => ipcRenderer.invoke('start-transcription', { filePath, options }),
   onTranscriptionProgress: (callback) => ipcRenderer.on('transcription-progress', (_, progress) => callback(progress)),
   onTranscriptionData: (callback) => ipcRenderer.on('transcription-data', (_, data) => callback(data)),
-  detectHardware: () => ipcRenderer.invoke('detect-hardware')
+  detectHardware: () => ipcRenderer.invoke('detect-hardware'),
+  openExplorer: (path) => ipcRenderer.send('open-explorer', path)
 }
 
 if (process.contextIsolated) {

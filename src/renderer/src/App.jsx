@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import logo from './assets/logo.png'
 
 import CustomSelect from './components/CustomSelect'
+import ResultModal from './components/ResultModal'
 
 const languages = [
   { id: 'auto', name: 'AUTO (Recommended)' },
@@ -49,6 +50,7 @@ function App() {
     model: 'small',
     format: 'srt'
   })
+  const [showResult, setShowResult] = useState(null)
 
   useEffect(() => {
     if (!window.api) {
@@ -109,7 +111,7 @@ function App() {
     try {
       const result = await window.api.startTranscription(file.path, config)
       if (result.success) {
-        alert('Transcription Complete! Output: ' + result.outputPath)
+        setShowResult(result.outputPath)
       }
     } catch (error) {
       alert('Error: ' + error.message)
@@ -310,6 +312,13 @@ function App() {
           </div>
         </div>
       </footer>
+
+      {/* Custom Result Modal */}
+      <ResultModal 
+        isOpen={!!showResult} 
+        path={showResult} 
+        onClose={() => setShowResult(null)} 
+      />
     </div>
   )
 }
