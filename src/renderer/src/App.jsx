@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { 
-  LayoutDashboard, 
-  Box, 
-  ListMusic, 
-  Settings, 
-  X, 
-  Minus, 
+import {
+  LayoutDashboard,
+  Box,
+  ListMusic,
+  Settings,
+  X,
+  Minus,
   Square,
   UploadCloud,
   ChevronDown,
@@ -56,7 +56,7 @@ function App() {
       return
     }
     window.api.detectHardware().then(setHardware)
-    
+
     window.api.onTranscriptionProgress((p) => {
       setProgress(p)
     })
@@ -105,7 +105,7 @@ function App() {
     if (!file) return
     setIsTranscribing(true)
     setProgress(0)
-    
+
     try {
       const result = await window.api.startTranscription(file.path, config)
       if (result.success) {
@@ -133,12 +133,12 @@ function App() {
         {/* Header */}
         <header className="header">
           <div className="logo-section">
-            <img src={logo} alt="Voicext Logo" style={{ height: '32px' }} />
+            <img src={logo} alt="Voicext Logo" style={{ height: '128px' }} />
           </div>
 
           <nav className="nav-tabs">
             {['dashboard', 'models', 'queue', 'settings'].map((tab) => (
-              <div 
+              <div
                 key={tab}
                 className={`nav-item ${activeTab === tab ? 'active' : ''}`}
                 onClick={() => setActiveTab(tab)}
@@ -156,14 +156,14 @@ function App() {
         {/* Content Area */}
         <AnimatePresence mode="wait">
           {activeTab === 'dashboard' && (
-            <motion.div 
+            <motion.div
               key="dashboard"
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 1.02 }}
               className="dashboard-grid"
             >
-              <div 
+              <div
                 className={`drop-zone glass ${dragActive ? 'drag-active' : ''}`}
                 onDragEnter={handleDrag}
                 onDragLeave={handleDrag}
@@ -176,8 +176,8 @@ function App() {
                     <div className="progress-circle">
                       <svg width="120" height="120">
                         <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="8" />
-                        <motion.circle 
-                          cx="60" cy="60" r="54" fill="none" 
+                        <motion.circle
+                          cx="60" cy="60" r="54" fill="none"
                           stroke="url(#gradient)" strokeWidth="8"
                           strokeDasharray="339.29"
                           initial={{ strokeDashoffset: 339.29 }}
@@ -206,8 +206,8 @@ function App() {
                       <div style={{ textAlign: 'center' }}>
                         <h2 style={{ fontSize: '20px', color: 'var(--primary-cyan)' }}>{file.name}</h2>
                         <p>File Ready for Transcription</p>
-                        <button 
-                          className="btn-secondary" 
+                        <button
+                          className="btn-secondary"
                           onClick={(e) => { e.stopPropagation(); setFile(null); }}
                           style={{ marginTop: '10px', background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: '#666', padding: '5px 15px', borderRadius: '20px', cursor: 'pointer' }}
                         >
@@ -233,30 +233,30 @@ function App() {
                     <Monitor size={14} />
                     Quick Configuration
                   </div>
-                  
-                  <CustomSelect 
+
+                  <CustomSelect
                     label="Language:"
                     options={languages}
                     value={config.language}
                     onChange={(val) => setConfig({ ...config, language: val })}
                   />
 
-                  <CustomSelect 
+                  <CustomSelect
                     label="Model:"
                     options={models}
                     value={config.model}
                     onChange={(val) => setConfig({ ...config, model: val })}
                   />
 
-                  <CustomSelect 
+                  <CustomSelect
                     label="Format:"
                     options={formats}
                     value={config.format}
                     onChange={(val) => setConfig({ ...config, format: val })}
                   />
 
-                  <button 
-                    className="btn-primary" 
+                  <button
+                    className="btn-primary"
                     style={{ marginTop: '20px', opacity: file ? 1 : 0.5, cursor: file ? 'pointer' : 'not-allowed' }}
                     disabled={!file || isTranscribing}
                     onClick={startTranscription}
@@ -269,7 +269,7 @@ function App() {
           )}
 
           {activeTab === 'models' && (
-            <motion.div 
+            <motion.div
               key="models"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
