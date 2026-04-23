@@ -149,7 +149,7 @@ function App() {
           </div>
 
           <nav className="nav-tabs">
-            {['dashboard', 'models', 'queue', 'settings'].map((tab) => (
+            {['dashboard', 'models', 'editor', 'settings'].map((tab) => (
               <div
                 key={tab}
                 className={`nav-item ${activeTab === tab ? 'active' : ''}`}
@@ -157,7 +157,7 @@ function App() {
               >
                 {tab === 'dashboard' && <LayoutDashboard size={18} />}
                 {tab === 'models' && <Box size={18} />}
-                {tab === 'queue' && <ListMusic size={18} />}
+                {tab === 'editor' && <ListMusic size={18} />}
                 {tab === 'settings' && <Settings size={18} />}
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </div>
@@ -307,9 +307,9 @@ function App() {
             </motion.div>
           )}
 
-          {activeTab === 'queue' && (
+          {activeTab === 'editor' && (
             <motion.div
-              key="queue"
+              key="editor"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 1.05 }}
@@ -325,7 +325,7 @@ function App() {
                     <ListMusic size={80} color="white" style={{ position: 'relative', zIndex: 1 }} />
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <h2>SRT EDITOR & QUEUE</h2>
+                    <h2>SRT EDITOR</h2>
                     <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>Select an SRT file to fix timestamps and edit text.</p>
                     <button className="btn-primary" style={{ maxWidth: '300px', margin: '0 auto' }} onClick={handleSelectSrt}>
                       Browse SRT Files
@@ -359,7 +359,7 @@ function App() {
         onClose={() => setShowResult(null)} 
         onEdit={(path) => {
           setSelectedSrt(path)
-          setActiveTab('queue')
+          setActiveTab('editor')
         }}
       />
     </div>

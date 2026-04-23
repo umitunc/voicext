@@ -1,9 +1,9 @@
 "use strict";
 const electron = require("electron");
 const path = require("path");
+const fs = require("fs");
 const utils = require("@electron-toolkit/utils");
 const child_process = require("child_process");
-const fs = require("fs");
 const iconv = require("iconv-lite");
 const icon = path.join(__dirname, "../../resources/icon.png");
 const BIN_PATH = electron.app.isPackaged ? path.join(process.resourcesPath, "bin") : path.join(electron.app.getAppPath(), "bin");
@@ -230,6 +230,44 @@ function createWindow() {
   });
   electron.ipcMain.on("open-explorer", (event, path2) => {
     electron.shell.showItemInFolder(path2);
+  });
+  electron.ipcMain.handle("read-srt", async (event, filePath) => {
+    try {
+      const content = fs.readFileSync(filePath, "utf-8");
+      return content;
+    } catch (error) {
+      console.error("Read SRT Error:", error);
+      throw error;
+    }
+  });
+  electron.ipcMain.handle("save-srt", async (event, { filePath, content }) => {
+    try {
+      fs.writeFileSync(filePath, content, "utf-8");
+      return { success: true };
+    } catch (error) {
+      console.error("Save SRT Error:", error);
+      throw error;
+    }
+  });
+  electron.ipcMain.handle("select-file", async (event, filters) => {
+    const { dialog } = require("electron");
+    const result = await dialog.showOpenDialog({
+      properties: ["openFile"],
+      filters: filters || []
+    });
+    if (result.canceled) return null;
+    return result.filePaths[0];
+  });
+  electron.ipcMain.handle("optimize-srt", async (event, filePath) => {
+    try {
+      const content = fs.readFileSync(filePath, "utf-8");
+      const optimized = fixSrt(content);
+      fs.writeFileSync(filePath, optimized, "utf-8");
+      return { success: true, content: optimized };
+    } catch (error) {
+      console.error("Optimize SRT Error:", error);
+      throw error;
+    }
   });
 }
 electron.app.whenReady().then(() => {

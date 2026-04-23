@@ -7,7 +7,11 @@ const api = {
   onTranscriptionProgress: (callback) => electron.ipcRenderer.on("transcription-progress", (_, progress) => callback(progress)),
   onTranscriptionData: (callback) => electron.ipcRenderer.on("transcription-data", (_, data) => callback(data)),
   detectHardware: () => electron.ipcRenderer.invoke("detect-hardware"),
-  openExplorer: (path) => electron.ipcRenderer.send("open-explorer", path)
+  openExplorer: (path) => electron.ipcRenderer.send("open-explorer", path),
+  readSrt: (filePath) => electron.ipcRenderer.invoke("read-srt", filePath),
+  saveSrt: (filePath, content) => electron.ipcRenderer.invoke("save-srt", { filePath, content }),
+  selectFile: (filters) => electron.ipcRenderer.invoke("select-file", filters),
+  optimizeSrt: (filePath) => electron.ipcRenderer.invoke("optimize-srt", filePath)
 };
 if (process.contextIsolated) {
   try {

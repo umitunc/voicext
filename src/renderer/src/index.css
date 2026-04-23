@@ -90,6 +90,7 @@ body {
   flex-direction: column;
   padding: 20px;
   padding-top: 0;
+  min-height: 0; /* Important for flex children to scroll */
 }
 
 .header {
@@ -662,21 +663,31 @@ body {
 .segments-list {
   flex: 1;
   overflow-y: auto;
-  padding-right: 10px;
+  padding-right: 15px;
   margin-bottom: 20px;
+  min-height: 0;
 }
 
 .segments-list::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 .segments-list::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 10px;
 }
 
 .segments-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 242, 255, 0.2);
   border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.segments-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 242, 255, 0.4);
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 .segments-header {
