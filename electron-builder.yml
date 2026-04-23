@@ -1,0 +1,33 @@
+appId: com.voicext.app
+productName: VoiceXt
+directories:
+  output: out/make
+  buildResources: resources
+
+files:
+  - out/main/index.js
+  - out/preload/index.js
+  - out/renderer/**/*
+  - package.json
+
+extraResources:
+  - from: bin
+    to: bin
+    filter:
+      - "**/*"
+
+win:
+  target: nsis
+  icon: resources/icon.png
+  artifactName: "${productName}-Setup-${version}.${ext}"
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: VoiceXt
+  createDesktopShortcut: true
+
+publish:
+  provider: github
+  owner: truncgil
+  repo: voicext

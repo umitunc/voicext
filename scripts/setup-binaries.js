@@ -67,9 +67,15 @@ async function setup() {
     fs.unlinkSync(whisperZipPath)
 
     console.log('Downloading Base Model (140MB)...')
-    const modelPath = path.join(modelsDir, 'ggml-base.bin')
-    if (!fs.existsSync(modelPath)) {
-      await downloadFile('https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin', modelPath)
+    const baseModelPath = path.join(modelsDir, 'ggml-base.bin')
+    if (!fs.existsSync(baseModelPath)) {
+      await downloadFile('https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin', baseModelPath)
+    }
+
+    console.log('Downloading Small Model (460MB)...')
+    const smallModelPath = path.join(modelsDir, 'ggml-small.bin')
+    if (!fs.existsSync(smallModelPath)) {
+      await downloadFile('https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin', smallModelPath)
     }
 
     console.log('Setup Complete!')

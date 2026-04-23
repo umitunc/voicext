@@ -1,9 +1,10 @@
 {
   "name": "voicext",
   "version": "1.0.0",
-  "description": "Local AI Transcription Tool",
+  "productName": "VoiceXt",
+  "description": "High Performance Local AI Transcription Tool",
   "main": "./out/main/index.js",
-  "author": "Voicext",
+  "author": "Truncgil Software",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
