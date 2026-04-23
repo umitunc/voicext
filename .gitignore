@@ -1,1 +1,13 @@
-node_modules
+node_modules/
+bin/
+out/
+dist/
+*.log
+.DS_Store
+.vscode/
+.idea/
+*.wav
+*.mp3
+*.srt
+!test_real.wav
+!test_real.srt

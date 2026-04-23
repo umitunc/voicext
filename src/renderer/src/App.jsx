@@ -16,6 +16,27 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 import logo from './assets/logo.png'
 
+import CustomSelect from './components/CustomSelect'
+
+const languages = [
+  { id: 'auto', name: 'AUTO (Recommended)' },
+  { id: 'tr', name: 'Turkish' },
+  { id: 'en', name: 'English' }
+]
+
+const models = [
+  { id: 'small', name: 'SMALL (Recommended, 460MB)' },
+  { id: 'base', name: 'BASE (Fast, Lower Quality, 140MB)' },
+  { id: 'medium', name: 'MEDIUM (Best Quality, 1.5GB)' },
+  { id: 'large', name: 'LARGE (Highest Quality, 3GB)' }
+]
+
+const formats = [
+  { id: 'srt', name: '.SRT (Premiere Pro Compatible)' },
+  { id: 'vtt', name: '.VTT (Web Standard)' },
+  { id: 'txt', name: '.TXT (Plain Text)' }
+]
+
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [dragActive, setDragActive] = useState(false)
@@ -25,11 +46,15 @@ function App() {
   const [hardware, setHardware] = useState({ gpu: false, name: 'Detecting...' })
   const [config, setConfig] = useState({
     language: 'tr',
-    model: 'base',
+    model: 'small',
     format: 'srt'
   })
 
   useEffect(() => {
+    if (!window.api) {
+      console.error('Electron API not found!')
+      return
+    }
     window.api.detectHardware().then(setHardware)
     
     window.api.onTranscriptionProgress((p) => {
@@ -38,6 +63,7 @@ function App() {
   }, [])
 
   const handleControl = (action) => {
+    if (!window.api) return
     window.api.windowControls(action)
   }
 
@@ -208,37 +234,30 @@ function App() {
                     Quick Configuration
                   </div>
                   
-                  <div className="input-group">
-                    <label>Language:</label>
-                    <select className="select-custom">
-                      <option>AUTO (Recommended)</option>
-                      <option>Turkish</option>
-                      <option>English</option>
-                    </select>
-                  </div>
+                  <CustomSelect 
+                    label="Language:"
+                    options={languages}
+                    value={config.language}
+                    onChange={(val) => setConfig({ ...config, language: val })}
+                  />
 
-                  <div className="input-group">
-                    <label>Model:</label>
-                    <select className="select-custom">
-                      <option>BASE (Fastest, 140MB)</option>
-                      <option>SMALL (Balanced)</option>
-                      <option>MEDIUM (Accurate)</option>
-                      <option>LARGE (Best Quality)</option>
-                    </select>
-                  </div>
+                  <CustomSelect 
+                    label="Model:"
+                    options={models}
+                    value={config.model}
+                    onChange={(val) => setConfig({ ...config, model: val })}
+                  />
 
-                  <div className="input-group">
-                    <label>Format:</label>
-                    <select className="select-custom">
-                      <option>.SRT (Premiere Pro Compatible)</option>
-                      <option>.VTT (Web Standard)</option>
-                      <option>.TXT (Plain Text)</option>
-                    </select>
-                  </div>
+                  <CustomSelect 
+                    label="Format:"
+                    options={formats}
+                    value={config.format}
+                    onChange={(val) => setConfig({ ...config, format: val })}
+                  />
 
                   <button 
                     className="btn-primary" 
-                    style={{ marginTop: '10px', opacity: file ? 1 : 0.5, cursor: file ? 'pointer' : 'not-allowed' }}
+                    style={{ marginTop: '20px', opacity: file ? 1 : 0.5, cursor: file ? 'pointer' : 'not-allowed' }}
                     disabled={!file || isTranscribing}
                     onClick={startTranscription}
                   >
@@ -281,10 +300,11 @@ function App() {
       {/* Status Bar */}
       <footer className="status-bar">
         <div className="status-indicator">
-          <span>SYSTEM: RTX 5080 DETECTED (GPU Acceleration ON)</span>
+          <div className="indicator-dot" style={{ backgroundColor: hardware.gpu ? '#00ff88' : '#ffaa00', boxShadow: hardware.gpu ? '0 0 8px #00ff88' : '0 0 8px #ffaa00' }}></div>
+          <span>SYSTEM: {hardware.name.toUpperCase()} {hardware.gpu ? 'DETECTED (GPU ACCELERATION ON)' : 'DETECTED (CPU ONLY)'}</span>
         </div>
         <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-          <span>READY</span>
+          <span>{isTranscribing ? 'PROCESSING...' : 'READY'}</span>
           <div className="offline-badge">
             OFFLINE MODE ACTIVE
           </div>

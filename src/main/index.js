@@ -13,7 +13,7 @@ function createWindow() {
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
-      preload: join(__dirname, '../preload/index.mjs'),
+      preload: join(__dirname, '../preload/index.js'),
       sandbox: false
     },
     frame: false,
@@ -43,10 +43,14 @@ function createWindow() {
         filePath,
         options,
         (progress) => {
-          mainWindow.webContents.send('transcription-progress', progress)
+          if (!mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('transcription-progress', progress)
+          }
         },
         (data) => {
-          mainWindow.webContents.send('transcription-data', data)
+          if (!mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('transcription-data', data)
+          }
         }
       )
       return result
@@ -60,6 +64,14 @@ function createWindow() {
   ipcMain.handle('detect-hardware', async () => {
     return await detectHardware()
   })
+
+  // Handle window controls
+  ipcMain.on('window-controls', (event, action) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (action === 'minimize') win.minimize()
+    if (action === 'maximize') win.isMaximized() ? win.unmaximize() : win.maximize()
+    if (action === 'close') win.close()
+  })
 }
 
 app.whenReady().then(() => {
@@ -67,14 +79,6 @@ app.whenReady().then(() => {
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
-  })
-
-  // IPC handlers
-  ipcMain.on('window-controls', (event, action) => {
-    const win = BrowserWindow.fromWebContents(event.sender)
-    if (action === 'minimize') win.minimize()
-    if (action === 'maximize') win.isMaximized() ? win.unmaximize() : win.maximize()
-    if (action === 'close') win.close()
   })
 
   createWindow()

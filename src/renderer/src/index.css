@@ -330,6 +330,44 @@ body {
   box-shadow: 0 0 8px #00ff88;
 }
 
+/* Custom Select Styles */
+.relative { position: relative; }
+.absolute { position: absolute; }
+.z-50 { z-index: 50; }
+.mt-1 { margin-top: 4px; }
+.w-full { width: 100%; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.bg-dark-glass {
+  background: rgba(15, 15, 25, 0.9);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.max-height-60 { max-height: 240px; }
+.py-1 { padding-top: 4px; padding-bottom: 4px; }
+.py-2 { padding-top: 8px; padding-bottom: 8px; }
+.pl-10 { padding-left: 40px; }
+.pr-4 { padding-right: 16px; }
+.pl-3 { padding-left: 12px; }
+
+.select-none { user-select: none; }
+.cursor-default { cursor: default; }
+.font-normal { font-weight: 400; }
+.font-medium { font-weight: 500; }
+
+.text-primary-cyan { color: var(--primary-cyan); }
+
+/* Animation for select dropdown */
+.transition { transition-property: opacity, transform; }
+.ease-in { transition-timing-function: cubic-bezier(0.4, 0, 1, 1); }
+.duration-100 { transition-duration: 100ms; }
+.opacity-0 { opacity: 0; }
+.opacity-100 { opacity: 1; }
+
 .drop-zone.drag-active {
   border-color: var(--primary-cyan);
   background: rgba(0, 242, 255, 0.05);
