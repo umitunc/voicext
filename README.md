@@ -6,19 +6,22 @@ Voicext is a high-performance desktop application built with **Electron** and **
 
 ## 📸 Screenshots
 
-````carousel
-![Dashboard](docs/ss/dashboard.png)
-<!-- slide -->
-![Start Transcription](docs/ss/start-transcripting.png)
-<!-- slide -->
-![Transcription Progress](docs/ss/transcription-complete.png)
-<!-- slide -->
-![SRT Editor](docs/ss/editor.png)
-<!-- slide -->
-![Model Management](docs/ss/model-management.png)
-<!-- slide -->
-![Use Case](docs/ss/ss-youtube.jpeg)
-````
+<div align="center">
+  <table>
+    <tr>
+      <td width="50%"><img src="docs/ss/dashboard.png" alt="Dashboard"/><br/><sub><b>Main Dashboard</b></sub></td>
+      <td width="50%"><img src="docs/ss/start-transcripting.png" alt="Start Transcription"/><br/><sub><b>New Transcription</b></sub></td>
+    </tr>
+    <tr>
+      <td width="50%"><img src="docs/ss/transcription-complete.png" alt="Transcription Progress"/><br/><sub><b>Processing & Results</b></sub></td>
+      <td width="50%"><img src="docs/ss/editor.png" alt="SRT Editor"/><br/><sub><b>Built-in SRT Editor</b></sub></td>
+    </tr>
+    <tr>
+      <td width="50%"><img src="docs/ss/model-management.png" alt="Model Management"/><br/><sub><b>AI Model Management</b></sub></td>
+      <td width="50%"><img src="docs/ss/ss-youtube.jpeg" alt="Use Case"/><br/><sub><b>Professional Output</b></sub></td>
+    </tr>
+  </table>
+</div>
 
 *A modern, glassmorphic UI designed for speed and clarity.*
 
