@@ -228,6 +228,9 @@ function createWindow() {
     if (action === "maximize") win.isMaximized() ? win.unmaximize() : win.maximize();
     if (action === "close") win.close();
   });
+  electron.ipcMain.on("open-explorer", (event, path2) => {
+    electron.shell.showItemInFolder(path2);
+  });
 }
 electron.app.whenReady().then(() => {
   utils.electronApp.setAppUserModelId("com.voicext.app");

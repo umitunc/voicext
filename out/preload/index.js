@@ -6,7 +6,8 @@ const api = {
   startTranscription: (filePath, options) => electron.ipcRenderer.invoke("start-transcription", { filePath, options }),
   onTranscriptionProgress: (callback) => electron.ipcRenderer.on("transcription-progress", (_, progress) => callback(progress)),
   onTranscriptionData: (callback) => electron.ipcRenderer.on("transcription-data", (_, data) => callback(data)),
-  detectHardware: () => electron.ipcRenderer.invoke("detect-hardware")
+  detectHardware: () => electron.ipcRenderer.invoke("detect-hardware"),
+  openExplorer: (path) => electron.ipcRenderer.send("open-explorer", path)
 };
 if (process.contextIsolated) {
   try {
