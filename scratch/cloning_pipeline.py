@@ -185,6 +185,23 @@ def ms_to_srt(ms):
     return f"{h:02}:{m:02}:{s:02},{ms:03}"
 
 
+def get_media_duration_ms(ffmpeg_path, media_path):
+    """Extract exact duration in milliseconds from media file using ffmpeg probe."""
+    try:
+        probe = subprocess.run(
+            [ffmpeg_path, "-i", media_path],
+            capture_output=True, text=True
+        )
+        dur_match = re.search(r"Duration:\s*(\d{2}):(\d{2}):(\d{2})[\.,](\d{2})", probe.stderr)
+        if dur_match:
+            h, m, s, cs = map(int, dur_match.groups())
+            return ((h * 3600 + m * 60 + s) * 1000) + (cs * 10)
+    except Exception:
+        pass
+    return None
+
+
+
 # ---------------------------------------------------------------------------
 # Step 3 – Translate with MarianMT (Helsinki-NLP)
 # ---------------------------------------------------------------------------
@@ -302,6 +319,7 @@ def build_dubbed_audio(ffmpeg_path, original_wav, audio_segments, tmpdir, total_
     # Pre-process each segment to ensure it fits its assigned slot perfectly and is speed-adjusted if needed
     for i, (start_ms, end_ms, wav_path) in enumerate(audio_segments):
         target_dur_ms = max(100, end_ms - start_ms)
+        target_dur_sec = target_dur_ms / 1000.0
         
         # Get actual duration of the generated TTS wav
         probe = subprocess.run(
@@ -321,21 +339,17 @@ def build_dubbed_audio(ffmpeg_path, original_wav, audio_segments, tmpdir, total_
         # If the generated speech is longer than the slot, speed it up using 'atempo'
         if actual_dur_ms > target_dur_ms + 100:  # Allow 100ms tolerance
             speed = min(2.0, max(0.5, actual_dur_ms / target_dur_ms))
-            cmd = [
-                ffmpeg_path, "-y", "-i", wav_path,
-                "-filter:a", f"atempo={speed:.2f}",
-                "-ar", "44100", "-ac", "1",
-                out_processed
-            ]
-            subprocess.run(cmd, capture_output=True)
+            filter_str = f"atempo={speed:.2f},apad=whole_dur={target_dur_sec:.3f},atrim=end={target_dur_sec:.3f}"
         else:
-            # Just standardize sample rate and channels
-            cmd = [
-                ffmpeg_path, "-y", "-i", wav_path,
-                "-ar", "44100", "-ac", "1",
-                out_processed
-            ]
-            subprocess.run(cmd, capture_output=True)
+            filter_str = f"apad=whole_dur={target_dur_sec:.3f},atrim=end={target_dur_sec:.3f}"
+            
+        cmd = [
+            ffmpeg_path, "-y", "-i", wav_path,
+            "-filter:a", filter_str,
+            "-ar", "44100", "-ac", "1",
+            out_processed
+        ]
+        subprocess.run(cmd, capture_output=True)
             
         if os.path.exists(out_processed):
             processed_segments.append((start_ms, end_ms, out_processed))
@@ -518,8 +532,10 @@ def main():
 
             # Step 5: Build dubbed audio
             if audio_segs:
-                # Get total duration in ms (rough estimate from last segment)
-                total_ms = segments[-1]["end"] + 2000
+                # Get exact duration of original media
+                total_ms = get_media_duration_ms(ffmpeg_path, input_file)
+                if not total_ms:
+                    total_ms = segments[-1]["end"] + 2000
                 dubbed_wav = build_dubbed_audio(ffmpeg_path, audio_wav, audio_segs, tmpdir, total_ms)
             # Step 5.5: Apply Lip-Sync (Wav2Lip)
             if args.lip_sync:
