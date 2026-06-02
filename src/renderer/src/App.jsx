@@ -60,7 +60,7 @@ function App() {
   const [translationConfig, setTranslationConfig] = useState({
     lipSync: false,
     whisperModel: 'small',  // Whisper STT model: tiny/base/small/medium/large
-    ttsModel: 'gtts',       // TTS engine: gtts (offline) | xtts (GPU, voice clone)
+    ttsModel: 'xtts',       // TTS engine: gtts (offline) | xtts (GPU, voice clone)
     sourceLang: 'tr',
     targetLang: 'en'
   })

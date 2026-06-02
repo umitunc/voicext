@@ -198,7 +198,7 @@ function translateVideo(videoPath, options, onStatus) {
       lipSync = false,
       whisperModel = "small",
       // Whisper: tiny | base | small | medium | large
-      ttsModel = "gtts"
+      ttsModel = "xtts"
       // TTS engine: gtts | xtts
     } = options;
     const ext = path.extname(videoPath);

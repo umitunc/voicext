@@ -39,7 +39,7 @@ export function translateVideo(videoPath, options, onStatus) {
     const {
       lipSync      = false,
       whisperModel = 'small',  // Whisper: tiny | base | small | medium | large
-      ttsModel     = 'gtts'    // TTS engine: gtts | xtts
+      ttsModel     = 'xtts'    // TTS engine: gtts | xtts
     } = options
 
     // Determine the output path (e.g. videoName_translated.mp4)
