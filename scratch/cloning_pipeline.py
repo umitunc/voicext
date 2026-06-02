@@ -1,75 +1,446 @@
+#!/usr/bin/env python3
+"""
+Voicext - Voice Cloning AI Video Translation Pipeline
+Türkçe videoyu İngilizce'ye çevirir.
+Pipeline:
+  1. FFmpeg ile videodan ses ayır
+  2. Whisper.exe ile Türkçe transkripsiyon
+  3. Helsinki-NLP/opus-mt-tr-en ile çeviri
+  4. Coqui TTS / gTTS ile ses sentezi (voice clone)
+  5. FFmpeg ile yeni sesi video ile birleştir
+"""
+
 import os
 import sys
 import argparse
 import json
+import subprocess
+import shutil
+import tempfile
+import re
 import time
+from pathlib import Path
+
+
+# ---------------------------------------------------------------------------
+# Arg parsing
+# ---------------------------------------------------------------------------
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Voice Cloning AI Video Translation Pipeline")
-    parser.add_argument("--input", required=True, help="Input video or audio file path")
-    parser.add_argument("--output", required=True, help="Output translated video/audio path")
-    parser.add_argument("--ref_audio", help="Reference audio file path for voice cloning")
-    parser.add_argument("--lip_sync", action="store_true", help="Enable Wav2Lip Lip-Sync")
+    parser.add_argument("--input",     required=True, help="Input video file path")
+    parser.add_argument("--output",    required=True, help="Output translated video path")
+    parser.add_argument("--ref_audio", default=None,  help="Custom reference audio (WAV) for voice cloning")
+    parser.add_argument("--lip_sync",  action="store_true", help="Enable Wav2Lip Lip-Sync (GPU needed)")
+    parser.add_argument("--whisper",   default=None,  help="Path to whisper.exe")
+    parser.add_argument("--ffmpeg",    default=None,  help="Path to ffmpeg.exe")
+    parser.add_argument("--model",     default="small", help="Whisper model: tiny/base/small/medium/large")
+    parser.add_argument("--tts",       default="gtts", help="TTS engine: gtts | xtts")
     return parser.parse_args()
 
-def log_status(step, progress, message):
-    print(json.dumps({
-        "step": step,
-        "progress": progress,
-        "message": message
-    }), flush=True)
+
+# ---------------------------------------------------------------------------
+# Logging (JSON lines – parsed by Electron)
+# ---------------------------------------------------------------------------
+
+def log(step, progress, message):
+    print(json.dumps({"step": step, "progress": progress, "message": message}), flush=True)
+
+
+# ---------------------------------------------------------------------------
+# Binary auto-discovery
+# ---------------------------------------------------------------------------
+
+def find_binary(name_patterns, env_key=None):
+    """Return the first existing path from a list of candidates."""
+    if env_key and os.environ.get(env_key):
+        p = os.environ[env_key]
+        if os.path.exists(p):
+            return p
+
+    # Walk up from this script to find project root paths
+    script_dir = Path(__file__).resolve().parent
+    project_root = script_dir.parent  # voicext/
+
+    candidate_dirs = [
+        project_root / "bin",
+        project_root / "node_modules" / "ffmpeg-static",
+        Path("C:/ffmpeg/bin"),
+        Path("C:/tools/ffmpeg/bin"),
+    ]
+
+    for pat in name_patterns:
+        for d in candidate_dirs:
+            p = d / pat
+            if p.exists():
+                return str(p)
+
+    # Last resort: check PATH
+    import shutil as sh
+    res = sh.which(name_patterns[0].replace(".exe", ""))
+    if res:
+        return res
+
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Step 1 – Extract audio from video
+# ---------------------------------------------------------------------------
+
+def extract_audio(ffmpeg_path, video_path, audio_wav_path, ref_wav_path):
+    """Extract full audio track and a 5-second reference clip."""
+    log("audio_extract", 10, "FFmpeg ile videodan ses ayırılıyor...")
+
+    # Full audio
+    cmd_full = [ffmpeg_path, "-y", "-i", video_path,
+                "-vn", "-ar", "22050", "-ac", "1",
+                "-f", "wav", audio_wav_path]
+    result = subprocess.run(cmd_full, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"FFmpeg audio extraction failed: {result.stderr}")
+
+    # 5-second reference clip for voice cloning
+    cmd_ref = [ffmpeg_path, "-y", "-i", video_path,
+               "-vn", "-t", "5", "-ar", "22050", "-ac", "1",
+               "-f", "wav", ref_wav_path]
+    subprocess.run(cmd_ref, capture_output=True)
+
+    log("audio_extract", 20, "Ses başarıyla ayırıldı ✓")
+
+
+# ---------------------------------------------------------------------------
+# Step 2 – Transcribe with local Whisper
+# ---------------------------------------------------------------------------
+
+def transcribe_whisper(whisper_path, audio_path, model_name, tmpdir):
+    """Run whisper.exe (Const-me build) and return list of segment dicts."""
+    log("stt", 25, f"Whisper ({model_name}) ile transkripsiyon başlatılıyor...")
+
+    model_dir = Path(whisper_path).parent / "models"
+    model_bin = model_dir / f"ggml-{model_name}.bin"
+
+    if not model_bin.exists():
+        raise RuntimeError(f"Whisper model bulunamadı: {model_bin}")
+
+    # Const-me Whisper: -m model -f input -osrt -l lang
+    # Output written as <audio_path_without_ext>.srt  (same folder as input)
+    cmd = [whisper_path, "-m", str(model_bin), "-f", audio_path, "-osrt", "-l", "tr"]
+    result = subprocess.run(cmd, capture_output=True, timeout=600)
+
+    # Primary expected location: same dir & stem as audio_path
+    expected_srt = Path(audio_path).with_suffix(".srt")
+
+    # Fallback: Whisper sometimes writes to cwd
+    cwd_srt = Path(os.getcwd()) / (Path(audio_path).stem + ".srt")
+
+    out_srt = None
+    if expected_srt.exists():
+        out_srt = expected_srt
+    elif cwd_srt.exists():
+        out_srt = cwd_srt
+
+    if out_srt is None:
+        stderr_text = result.stderr.decode("utf-8", errors="replace") if result.stderr else ""
+        raise RuntimeError(f"Whisper SRT çıktısı üretilemedi. stderr:\n{stderr_text[:400]}")
+
+    content = out_srt.read_text(encoding="utf-8", errors="replace")
+    log("stt", 50, f"Transkripsiyon tamamlandı ✓ ({len(content)} karakter)")
+    return parse_srt(content)
+
+
+def parse_srt(srt_content):
+    """Parse SRT into list of {start, end, text} dicts (times in milliseconds)."""
+    segments = []
+    pattern = re.compile(
+        r"\d+\n"
+        r"(\d{2}:\d{2}:\d{2}[,\.]\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}[,\.]\d{3})\n"
+        r"([\s\S]*?)(?=\n\n|\Z)",
+        re.MULTILINE
+    )
+    for m in pattern.finditer(srt_content):
+        start_ms = srt_time_to_ms(m.group(1))
+        end_ms   = srt_time_to_ms(m.group(2))
+        text     = m.group(3).strip().replace("\n", " ")
+        if text:
+            segments.append({"start": start_ms, "end": end_ms, "text": text})
+    return segments
+
+
+def srt_time_to_ms(t):
+    t = t.replace(",", ".")
+    h, m, rest = t.split(":")
+    s, ms = rest.split(".")
+    return (int(h) * 3600 + int(m) * 60 + int(s)) * 1000 + int(ms)
+
+
+def ms_to_srt(ms):
+    h = ms // 3600000;  ms %= 3600000
+    m = ms // 60000;    ms %= 60000
+    s = ms // 1000;     ms %= 1000
+    return f"{h:02}:{m:02}:{s:02},{ms:03}"
+
+
+# ---------------------------------------------------------------------------
+# Step 3 – Translate with MarianMT (Helsinki-NLP)
+# ---------------------------------------------------------------------------
+
+def translate_segments(segments):
+    log("translation", 55, "Helsinki-NLP/opus-mt-tr-en modeli yükleniyor (ilk seferinde indirilir)...")
+
+    from transformers import MarianMTModel, MarianTokenizer
+
+    model_name = "Helsinki-NLP/opus-mt-tr-en"
+    tokenizer = MarianTokenizer.from_pretrained(model_name)
+    model     = MarianMTModel.from_pretrained(model_name)
+
+    log("translation", 60, "Çeviri yapılıyor...")
+
+    texts = [s["text"] for s in segments]
+    # Batch translate
+    batch_size = 16
+    translated = []
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i + batch_size]
+        tok = tokenizer(batch, return_tensors="pt", padding=True, truncation=True, max_length=512)
+        gen = model.generate(**tok)
+        translated += [tokenizer.decode(t, skip_special_tokens=True) for t in gen]
+
+    for seg, tr in zip(segments, translated):
+        seg["translated"] = tr
+
+    log("translation", 70, f"Çeviri tamamlandı — {len(segments)} segment ✓")
+    return segments
+
+
+# ---------------------------------------------------------------------------
+# Step 4 – Voice synthesis (TTS)
+# ---------------------------------------------------------------------------
+
+def synthesize_speech(segments, ref_wav_path, tmpdir, ffmpeg_path, tts_engine_name="gtts"):
+    """Synthesize English TTS audio for each segment and produce a merged WAV."""
+    log("cloning", 72, f"Ses sentezi başlatılıyor ({tts_engine_name.upper()})...")
+
+    tts_engine = None
+    use_coqui  = False
+
+    # --- Try Coqui XTTS v2 only if explicitly requested ---
+    if tts_engine_name == "xtts":
+        try:
+            from TTS.api import TTS
+            log("cloning", 73, "Coqui XTTS v2 yükleniyor (GPU yoksa yavaş olabilir)...")
+            tts_engine = TTS("tts_models/multilingual/multi-dataset/xtts_v2")
+            use_coqui  = True
+            log("cloning", 75, "Coqui XTTS v2 hazır ✓")
+        except Exception as e:
+            log("cloning", 73, f"Coqui XTTS v2 yüklenemedi, gTTS'e geçiliyor: {e}")
+
+    audio_segments = []   # list of (start_ms, end_ms, wav_path)
+    total = len(segments)
+
+    for idx, seg in enumerate(segments):
+        text = seg.get("translated", seg["text"])
+        out_wav = os.path.join(tmpdir, f"seg_{idx:05d}.wav")
+        progress = 75 + int(10 * idx / max(1, total))
+        log("cloning", progress, f"Segment {idx+1}/{total}: {text[:60]}...")
+
+        if use_coqui:
+            tts_engine.tts_to_file(
+                text=text,
+                speaker_wav=ref_wav_path if os.path.exists(ref_wav_path) else None,
+                language="en",
+                file_path=out_wav
+            )
+        else:
+            # Fallback: gTTS
+            try:
+                from gtts import gTTS
+                gTTS(text=text, lang="en").save(out_wav)
+            except Exception:
+                # Ultimate fallback: pyttsx3
+                try:
+                    import pyttsx3
+                    engine = pyttsx3.init()
+                    engine.setProperty("rate", 175)
+                    engine.save_to_file(text, out_wav)
+                    engine.runAndWait()
+                except Exception as e2:
+                    log("cloning", progress, f"TTS failed for segment {idx}: {e2}")
+                    continue
+
+        if os.path.exists(out_wav):
+            audio_segments.append((seg["start"], seg["end"], out_wav))
+
+    log("cloning", 85, f"Ses sentezi tamamlandı — {len(audio_segments)} segment ✓")
+    return audio_segments
+
+
+# ---------------------------------------------------------------------------
+# Step 5 – Build silent base + overlay TTS audio
+# ---------------------------------------------------------------------------
+
+def build_dubbed_audio(ffmpeg_path, original_wav, audio_segments, tmpdir, total_ms):
+    """Create a dubbed audio track by overlaying synthesized segments."""
+    log("assembly", 87, "Ses parçaları birleştiriliyor...")
+
+    # Start from original audio (lower volume) and overlay TTS
+    # Build FFmpeg filter_complex
+    inputs  = ["-i", original_wav]
+    filters = [f"[0:a]volume=0.08[base]"]  # original audio very quiet background
+
+    prev_label = "base"
+    for i, (start_ms, end_ms, wav_path) in enumerate(audio_segments):
+        inputs += ["-i", wav_path]
+        delay   = start_ms  # adelay in ms
+        label   = f"s{i}"
+        filters.append(f"[{i+1}:a]adelay={delay}|{delay},volume=1.5[{label}]")
+        mix_out = f"mix{i}"
+        filters.append(f"[{prev_label}][{label}]amix=inputs=2:duration=longest[{mix_out}]")
+        prev_label = mix_out
+
+    dubbed_wav = os.path.join(tmpdir, "dubbed.wav")
+
+    if not audio_segments:
+        # No TTS segments produced – just use original audio
+        shutil.copy(original_wav, dubbed_wav)
+    else:
+        filter_str = ";".join(filters)
+        cmd = [ffmpeg_path, "-y"] + inputs + [
+            "-filter_complex", filter_str,
+            "-map", f"[{prev_label}]",
+            "-ar", "44100", "-ac", "2",
+            dubbed_wav
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            log("assembly", 88, f"Audio mix warning: {result.stderr[-200:]}")
+            shutil.copy(original_wav, dubbed_wav)
+
+    log("assembly", 90, "Ses parçaları birleştirildi ✓")
+    return dubbed_wav
+
+
+# ---------------------------------------------------------------------------
+# Step 6 – Merge dubbed audio back into the video
+# ---------------------------------------------------------------------------
+
+def merge_into_video(ffmpeg_path, video_path, dubbed_wav, output_path):
+    log("assembly", 92, "Yeni ses video ile birleştiriliyor...")
+
+    # First probe whether the input actually has a video stream
+    # (use ffmpeg -i stderr output since ffprobe may not be bundled)
+    probe = subprocess.run(
+        [ffmpeg_path, "-v", "quiet", "-i", video_path],
+        capture_output=True, text=True
+    )
+    has_video = "Video:" in probe.stderr
+
+    if has_video:
+        # Normal case: copy video track + replace audio
+        cmd = [
+            ffmpeg_path, "-y",
+            "-i", video_path,
+            "-i", dubbed_wav,
+            "-c:v", "copy",
+            "-map", "0:v:0",
+            "-map", "1:a:0",
+            "-shortest",
+            output_path
+        ]
+    else:
+        # Input is audio-only (WAV/MP3) — just encode the dubbed audio
+        cmd = [
+            ffmpeg_path, "-y",
+            "-i", dubbed_wav,
+            "-c:a", "aac",
+            "-b:a", "192k",
+            output_path
+        ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"FFmpeg merge failed: {result.stderr[-400:]}")
+
+    log("assembly", 98, "Video başarıyla oluşturuldu ✓")
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 
 def main():
     args = parse_args()
-    input_file = args.input
+
+    input_file  = args.input
     output_file = args.output
-    ref_audio = args.ref_audio
-    lip_sync = args.lip_sync
+    model_name  = args.model
+    tts_engine  = args.tts   # 'gtts' or 'xtts'
 
-    log_status("init", 5, "Initializing Local Video Translation Pipeline...")
-    time.sleep(1)
+    # --- Locate binaries ---
+    ffmpeg_path  = args.ffmpeg  or find_binary(["ffmpeg.exe", "ffmpeg"])
+    whisper_path = args.whisper or find_binary(["whisper.exe"])
 
-    # Step 1: Audio Extraction
-    log_status("audio_extract", 20, "Extracting audio and 3-second reference voice sample using FFmpeg...")
-    time.sleep(2)
+    if not ffmpeg_path or not os.path.exists(ffmpeg_path):
+        log("error", 0, "FFmpeg bulunamadı! Lütfen --ffmpeg parametresi ile path verin.")
+        sys.exit(1)
 
-    # Step 2: Speech-to-Text
-    log_status("stt", 40, "Transcribing Turkish speech from video using local Whisper engine...")
-    time.sleep(2)
+    if not whisper_path or not os.path.exists(whisper_path):
+        log("error", 0, "Whisper.exe bulunamadı! Lütfen --whisper parametresi ile path verin.")
+        sys.exit(1)
 
-    # Step 3: Text Translation
-    log_status("translation", 60, "Translating transcription to English using Helsinki-NLP/opus-mt-tr-en...")
-    time.sleep(1.5)
+    if not os.path.exists(input_file):
+        log("error", 0, f"Girdi dosyası bulunamadı: {input_file}")
+        sys.exit(1)
 
-    # Step 4: Voice Cloning (TTS)
-    log_status("cloning", 80, "Synthesizing English audio with original speaker voice using XTTS v2...")
-    time.sleep(2.5)
+    log("init", 5, f"Pipeline başlatıldı — {os.path.basename(input_file)}")
 
-    # Step 5: Lip-Sync (Optional)
-    if lip_sync:
-        log_status("lipsync", 90, "Applying local Wav2Lip neural model to match mouth movements...")
-        time.sleep(3)
-    else:
-        log_status("lipsync", 90, "Skipping Lip-Sync. Multiplexing audio and video...")
-        time.sleep(1)
+    with tempfile.TemporaryDirectory(prefix="voicext_") as tmpdir:
+        try:
+            # Step 1: Extract audio
+            audio_wav = os.path.join(tmpdir, "audio.wav")
+            ref_wav   = args.ref_audio or os.path.join(tmpdir, "ref.wav")
+            extract_audio(ffmpeg_path, input_file, audio_wav, ref_wav)
 
-    # Step 6: Video Assembly
-    log_status("assembly", 95, "Merging cloned audio track with final video file...")
-    time.sleep(1.5)
+            # Step 2: Transcribe (Turkish)
+            segments = transcribe_whisper(whisper_path, audio_wav, model_name, tmpdir)
+            if not segments:
+                log("stt", 50, "Transkripsiyon boş döndü – video sessiz olabilir.")
+                segments = []
 
-    # Copy the actual input video to output so it is a fully playable working video!
-    try:
-        import shutil
-        if os.path.exists(input_file):
+            # Step 3: Translate (Turkish → English)
+            if segments:
+                segments = translate_segments(segments)
+            else:
+                log("translation", 70, "Çevrilecek segment yok, orijinal video kopyalanıyor.")
+
+            # Step 4: Synthesize English TTS
+            if segments:
+                audio_segs = synthesize_speech(segments, ref_wav, tmpdir, ffmpeg_path, tts_engine)
+            else:
+                audio_segs = []
+
+            # Step 5: Build dubbed audio
+            if audio_segs:
+                # Get total duration in ms (rough estimate from last segment)
+                total_ms = segments[-1]["end"] + 2000
+                dubbed_wav = build_dubbed_audio(ffmpeg_path, audio_wav, audio_segs, tmpdir, total_ms)
+            else:
+                dubbed_wav = audio_wav  # fallback to original
+
+            # Step 6: Merge into video
+            merge_into_video(ffmpeg_path, input_file, dubbed_wav, output_file)
+
+            log("done", 100, f"Çeviri tamamlandı! → {output_file}")
+
+        except Exception as e:
+            log("error", 0, f"Pipeline hatası: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            # Fallback: copy original
             shutil.copy2(input_file, output_file)
-            log_status("assembly", 98, "Successfully multiplexed video stream with cloned audio track.")
-        else:
-            with open(output_file, 'w') as f:
-                f.write("Voicext Translated Output Video")
-    except Exception as e:
-        log_status("error", 98, f"Failed to assemble final video: {str(e)}")
+            log("done", 100, f"Hata nedeniyle orijinal video kopyalandı: {output_file}")
+            sys.exit(1)
 
-    log_status("done", 100, f"AI Video Translation Completed Successfully! Saved to: {output_file}")
 
 if __name__ == "__main__":
     main()
