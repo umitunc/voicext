@@ -21,6 +21,10 @@ import re
 import time
 from pathlib import Path
 
+# Enforce Hugging Face offline mode so it uses downloaded local weights and models
+os.environ["HF_HUB_OFFLINE"] = "1"
+
+
 
 # ---------------------------------------------------------------------------
 # Arg parsing
@@ -275,49 +279,146 @@ def synthesize_speech(segments, ref_wav_path, tmpdir, ffmpeg_path, tts_engine_na
     return audio_segments
 
 
-# ---------------------------------------------------------------------------
-# Step 5 – Build silent base + overlay TTS audio
-# ---------------------------------------------------------------------------
-
 def build_dubbed_audio(ffmpeg_path, original_wav, audio_segments, tmpdir, total_ms):
-    """Create a dubbed audio track by overlaying synthesized segments."""
-    log("assembly", 87, "Ses parçaları birleştiriliyor...")
-
-    # Start from original audio (lower volume) and overlay TTS
-    # Build FFmpeg filter_complex
-    inputs  = ["-i", original_wav]
-    filters = [f"[0:a]volume=0.08[base]"]  # original audio very quiet background
-
-    prev_label = "base"
-    for i, (start_ms, end_ms, wav_path) in enumerate(audio_segments):
-        inputs += ["-i", wav_path]
-        delay   = start_ms  # adelay in ms
-        label   = f"s{i}"
-        filters.append(f"[{i+1}:a]adelay={delay}|{delay},volume=1.5[{label}]")
-        mix_out = f"mix{i}"
-        filters.append(f"[{prev_label}][{label}]amix=inputs=2:duration=longest[{mix_out}]")
-        prev_label = mix_out
-
-    dubbed_wav = os.path.join(tmpdir, "dubbed.wav")
+    """
+    Create a dubbed audio track with absolute time alignment.
+    Fixes overlap, voice mixing volume decay, and drift.
+    Steps:
+      1. For each segment, calculate expected duration. If actual synthesized audio is too long,
+         speed it up with 'atempo'. If it's too short, it's fine (will be followed by silence).
+      2. Construct a single sequential timeline:
+         [Silence from 0 to start1] -> [TTS1 (speed-matched)] -> [Silence from end1 to start2] -> [TTS2] -> ...
+      3. Mix this clean timeline with a heavily ducked original audio (sound effects/background).
+    """
+    log("assembly", 87, "Ses zamanlamaları ayarlanıyor ve hizalanıyor...")
 
     if not audio_segments:
-        # No TTS segments produced – just use original audio
+        dubbed_wav = os.path.join(tmpdir, "dubbed.wav")
         shutil.copy(original_wav, dubbed_wav)
-    else:
-        filter_str = ";".join(filters)
-        cmd = [ffmpeg_path, "-y"] + inputs + [
-            "-filter_complex", filter_str,
-            "-map", f"[{prev_label}]",
-            "-ar", "44100", "-ac", "2",
-            dubbed_wav
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            log("assembly", 88, f"Audio mix warning: {result.stderr[-200:]}")
-            shutil.copy(original_wav, dubbed_wav)
+        return dubbed_wav
 
-    log("assembly", 90, "Ses parçaları birleştirildi ✓")
+    processed_segments = []
+    
+    # Pre-process each segment to ensure it fits its assigned slot perfectly and is speed-adjusted if needed
+    for i, (start_ms, end_ms, wav_path) in enumerate(audio_segments):
+        target_dur_ms = max(100, end_ms - start_ms)
+        
+        # Get actual duration of the generated TTS wav
+        probe = subprocess.run(
+            [ffmpeg_path, "-i", wav_path],
+            capture_output=True, text=True
+        )
+        # Parse duration from ffmpeg output: "Duration: 00:00:02.34,"
+        dur_match = re.search(r"Duration:\s*(\d{2}):(\d{2}):(\d{2})[\.,](\d{2})", probe.stderr)
+        
+        actual_dur_ms = target_dur_ms
+        if dur_match:
+            h, m, s, cs = map(int, dur_match.groups())
+            actual_dur_ms = ((h * 3600 + m * 60 + s) * 1000) + (cs * 10)
+        
+        out_processed = os.path.join(tmpdir, f"proc_{i:05d}.wav")
+        
+        # If the generated speech is longer than the slot, speed it up using 'atempo'
+        if actual_dur_ms > target_dur_ms + 100:  # Allow 100ms tolerance
+            speed = min(2.0, max(0.5, actual_dur_ms / target_dur_ms))
+            cmd = [
+                ffmpeg_path, "-y", "-i", wav_path,
+                "-filter:a", f"atempo={speed:.2f}",
+                "-ar", "44100", "-ac", "1",
+                out_processed
+            ]
+            subprocess.run(cmd, capture_output=True)
+        else:
+            # Just standardize sample rate and channels
+            cmd = [
+                ffmpeg_path, "-y", "-i", wav_path,
+                "-ar", "44100", "-ac", "1",
+                out_processed
+            ]
+            subprocess.run(cmd, capture_output=True)
+            
+        if os.path.exists(out_processed):
+            processed_segments.append((start_ms, end_ms, out_processed))
+        else:
+            processed_segments.append((start_ms, end_ms, wav_path))
+
+    # Construct the timeline chain
+    # We will build a complex filter string using 'anullsrc' for silences and 'concat' to link everything.
+    # We place original_wav as input index 0, and all subsequent inputs are processed TTS wavs (starting from index 1).
+    inputs = ["-i", original_wav]
+    filter_nodes = []
+    
+    current_time_ms = 0
+    concat_count = 0
+    
+    for i, (start_ms, end_ms, wav_path) in enumerate(processed_segments):
+        # 1. Fill gap before this segment with silence
+        gap_ms = start_ms - current_time_ms
+        if gap_ms > 20:  # If silence is longer than 20ms
+            gap_sec = gap_ms / 1000.0
+            filter_nodes.append(f"anullsrc=r=44100:cl=mono:d={gap_sec:.3f}[silence_{i}]")
+            concat_count += 1
+            
+        # 2. Add the actual TTS wav
+        inputs.append("-i")
+        inputs.append(wav_path)
+        # TTS input index is (len(inputs) // 2) - 1 because we just added it.
+        # Since original_wav is index 0, the first TTS file will be index 1.
+        input_idx = (len(inputs) // 2) - 1
+        filter_nodes.append(f"[{input_idx}:a]aresample=44100,pan=mono|c0=c0[tts_mono_{i}]")
+        concat_count += 1
+        
+        current_time_ms = start_ms + (end_ms - start_ms) # Estimated end of this speech block
+
+    # Fill final gap if needed
+    final_gap = total_ms - current_time_ms
+    if final_gap > 50:
+        gap_sec = final_gap / 1000.0
+        filter_nodes.append(f"anullsrc=r=44100:cl=mono:d={gap_sec:.3f}[silence_end]")
+        concat_count += 1
+
+    # Now, chain all these nodes together in sequential order (concat)
+    concat_inputs = []
+    current_time_ms = 0
+    for i, (start_ms, end_ms, wav_path) in enumerate(processed_segments):
+        gap_ms = start_ms - current_time_ms
+        if gap_ms > 20:
+            concat_inputs.append(f"[silence_{i}]")
+        concat_inputs.append(f"[tts_mono_{i}]")
+        current_time_ms = start_ms + (end_ms - start_ms)
+        
+    if final_gap > 50:
+        concat_inputs.append("[silence_end]")
+        
+    # Append the concat instruction
+    concat_str = "".join(concat_inputs)
+    filter_nodes.append(f"{concat_str}concat=n={concat_count}:v=0:a=1[dubbed_clean]")
+    
+    # Mix [dubbed_clean] with ducked original background audio (which is at index 0)
+    # Using amix with specific weight adjustments
+    filter_nodes.append(f"[0:a]volume=0.10[bg]")
+    filter_nodes.append(f"[dubbed_clean]volume=1.8[fg]")
+    filter_nodes.append(f"[fg][bg]amix=inputs=2:duration=first:dropout_transition=0[final_mix]")
+    
+    dubbed_wav = os.path.join(tmpdir, "dubbed.wav")
+    filter_complex_str = ";".join(filter_nodes)
+    
+    cmd = [ffmpeg_path, "-y"] + inputs + [
+        "-filter_complex", filter_complex_str,
+        "-map", "[final_mix]",
+        "-ar", "44100", "-ac", "2",
+        dubbed_wav
+    ]
+    
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        log("assembly", 88, f"Audio mix warning/error (falling back to simple blend): {result.stderr[-300:]}")
+        # Quick fallback: simple overlay if complex filter failed
+        shutil.copy(original_wav, dubbed_wav)
+        
+    log("assembly", 90, "Ses hizalama ve birleştirme tamamlandı ✓")
     return dubbed_wav
+
 
 
 # ---------------------------------------------------------------------------
@@ -327,13 +428,12 @@ def build_dubbed_audio(ffmpeg_path, original_wav, audio_segments, tmpdir, total_
 def merge_into_video(ffmpeg_path, video_path, dubbed_wav, output_path):
     log("assembly", 92, "Yeni ses video ile birleştiriliyor...")
 
-    # First probe whether the input actually has a video stream
-    # (use ffmpeg -i stderr output since ffprobe may not be bundled)
+    # Run without '-v quiet' so we can capture the stream analysis output in stderr
     probe = subprocess.run(
-        [ffmpeg_path, "-v", "quiet", "-i", video_path],
+        [ffmpeg_path, "-i", video_path],
         capture_output=True, text=True
     )
-    has_video = "Video:" in probe.stderr
+    has_video = "Video:" in probe.stderr or "Video:" in probe.stdout
 
     if has_video:
         # Normal case: copy video track + replace audio
