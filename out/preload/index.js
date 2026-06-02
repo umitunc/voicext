@@ -14,7 +14,10 @@ const api = {
   readSrt: (filePath) => electron.ipcRenderer.invoke("read-srt", filePath),
   saveSrt: (filePath, content) => electron.ipcRenderer.invoke("save-srt", { filePath, content }),
   selectFile: (filters) => electron.ipcRenderer.invoke("select-file", filters),
-  optimizeSrt: (filePath) => electron.ipcRenderer.invoke("optimize-srt", filePath)
+  optimizeSrt: (filePath) => electron.ipcRenderer.invoke("optimize-srt", filePath),
+  getModelsStatus: () => electron.ipcRenderer.invoke("get-models-status"),
+  downloadModel: (model) => electron.ipcRenderer.invoke("download-model", model),
+  onModelDownloadProgress: (callback) => electron.ipcRenderer.on("model-download-progress", (_, data) => callback(data))
 };
 if (process.contextIsolated) {
   try {

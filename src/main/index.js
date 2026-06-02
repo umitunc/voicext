@@ -6,6 +6,7 @@ import icon from '../../resources/icon.png?asset'
 
 import { detectHardware, transcribe, fixSrt } from './engine/transcription'
 import { translateVideo } from './engine/translation_service'
+import { getModelsStatus, downloadModel } from './engine/models'
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -79,6 +80,16 @@ function createWindow() {
       console.error('Transcription Error:', error)
       throw error
     }
+  })
+
+  // Handle get models status
+  ipcMain.handle('get-models-status', async () => {
+    return getModelsStatus()
+  })
+
+  // Handle download model
+  ipcMain.handle('download-model', async (event, model) => {
+    return downloadModel(mainWindow, model)
   })
 
   // Handle hardware detection

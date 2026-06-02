@@ -88,12 +88,57 @@ function App() {
   const [showResult, setShowResult] = useState(null)
   const [selectedSrt, setSelectedSrt] = useState(null)
 
+  // Whisper Models status & progress
+  const [modelsStatus, setModelsStatus] = useState({ base: false, small: false, medium: false, large: false })
+  const [downloadProgress, setDownloadProgress] = useState({})
+
+  const fetchModelsStatus = async () => {
+    if (window.api && window.api.getModelsStatus) {
+      try {
+        const status = await window.api.getModelsStatus()
+        setModelsStatus(status)
+      } catch (err) {
+        console.error('Failed to get models status:', err)
+      }
+    }
+  }
+
+  const handleDownloadModel = async (modelKey) => {
+    if (!window.api || !window.api.downloadModel) return
+    setDownloadProgress(prev => ({ ...prev, [modelKey]: 0 }))
+    try {
+      await window.api.downloadModel(modelKey)
+      fetchModelsStatus()
+    } catch (err) {
+      alert(`Download failed: ${err.message}`)
+      setDownloadProgress(prev => {
+        const updated = { ...prev }
+        delete updated[modelKey]
+        return updated
+      })
+    }
+  }
+
   useEffect(() => {
     if (!window.api) {
       console.error('Electron API not found!')
       return
     }
     window.api.detectHardware().then(setHardware)
+    fetchModelsStatus()
+
+    // Model download progress listener
+    if (window.api.onModelDownloadProgress) {
+      window.api.onModelDownloadProgress(({ model, progress }) => {
+        setDownloadProgress(prev => ({
+          ...prev,
+          [model]: progress
+        }))
+        if (progress === 100) {
+          fetchModelsStatus()
+        }
+      })
+    }
 
     // STT Progress handler
     window.api.onTranscriptionProgress((p) => {
@@ -534,19 +579,60 @@ function App() {
               style={{ flex: 1, padding: '40px', display: 'flex', flexDirection: 'column', gap: '20px' }}
             >
               <h2>Model Management</h2>
-              <p style={{ color: 'var(--text-muted)' }}>Download and manage local AI models for offline transcription.</p>
-              <div className="models-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '20px', marginTop: '20px' }}>
-                {['Base', 'Small', 'Medium', 'Large'].map(m => (
-                  <div key={m} className="glass" style={{ padding: '20px', textAlign: 'center' }}>
-                    <h3 style={{ marginBottom: '10px' }}>{m}</h3>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '15px' }}>
-                      {m === 'Base' ? '140 MB' : m === 'Small' ? '460 MB' : m === 'Medium' ? '1.5 GB' : '2.9 GB'}
+              <p style={{ color: 'var(--text-muted)' }}>Download and manage local Whisper AI models for offline transcription.</p>
+              <div className="models-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '20px', marginTop: '20px' }}>
+                {[
+                  { key: 'base', name: 'Base', size: '140 MB', desc: 'Fast, Lower Quality' },
+                  { key: 'small', name: 'Small', size: '460 MB', desc: 'Recommended (Balanced)' },
+                  { key: 'medium', name: 'Medium', size: '1.5 GB', desc: 'High Quality (Slower)' },
+                  { key: 'large', name: 'Large', size: '2.9 GB', desc: 'Highest Quality (Best for GPUs)' }
+                ].map(m => {
+                  const isDownloaded = modelsStatus[m.key]
+                  const progress = downloadProgress[m.key]
+                  const isDownloading = progress !== undefined && progress < 100
+
+                  return (
+                    <div key={m.key} className="glass" style={{ padding: '25px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '220px', position: 'relative', overflow: 'hidden' }}>
+                      <div>
+                        <h3 style={{ marginBottom: '5px', fontSize: '18px', color: 'white' }}>{m.name}</h3>
+                        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px' }}>{m.desc}</p>
+                        <div style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--primary-cyan)', marginBottom: '15px' }}>
+                          {m.size}
+                        </div>
+                      </div>
+
+                      <div style={{ width: '100%' }}>
+                        {isDownloading ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--primary-cyan)' }}>
+                              <span>Downloading...</span>
+                              <span>{progress}%</span>
+                            </div>
+                            <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
+                              <div style={{ width: `${progress}%`, height: '100%', background: 'linear-gradient(90deg, var(--primary-cyan), var(--primary-magenta))', transition: 'width 0.2s ease' }}></div>
+                            </div>
+                          </div>
+                        ) : isDownloaded ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#00ff88', fontWeight: '600', fontSize: '13px' }}>
+                              <CheckCircle2 size={16} />
+                              Downloaded & Ready
+                            </div>
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Local model file active</span>
+                          </div>
+                        ) : (
+                          <button 
+                            className="btn-secondary" 
+                            style={{ width: '100%', padding: '10px 15px', borderRadius: '15px', border: '1px solid var(--primary-cyan)', color: 'var(--primary-cyan)', background: 'none', cursor: 'pointer', transition: 'all 0.2s ease' }}
+                            onClick={() => handleDownloadModel(m.key)}
+                          >
+                            Download Model
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <button className="btn-secondary" style={{ padding: '8px 15px', borderRadius: '15px', border: '1px solid var(--primary-cyan)', color: 'var(--primary-cyan)', background: 'none' }}>
-                      Download
-                    </button>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </motion.div>
           )}

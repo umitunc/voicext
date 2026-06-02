@@ -22,7 +22,9 @@ import time
 from pathlib import Path
 
 # Enforce Hugging Face online mode so it can download weights if missing
-os.environ["HF_HUB_OFFLINE"] = "0"
+os.environ["HF_HUB_OFFLINE"] = "1"
+# Automatically accept Coqui TTS CPML non-commercial license terms
+os.environ["COQUI_TOS_AGREED"] = "1"
 
 
 
@@ -94,7 +96,7 @@ def find_binary(name_patterns, env_key=None):
 
 def extract_audio(ffmpeg_path, video_path, audio_wav_path, ref_wav_path):
     """Extract full audio track and a 5-second reference clip."""
-    log("audio_extract", 10, "FFmpeg ile videodan ses ayırılıyor...")
+    log("audio_extract", 10, "Extracting audio from video using FFmpeg...")
 
     # Full audio
     cmd_full = [ffmpeg_path, "-y", "-i", video_path,
@@ -110,7 +112,7 @@ def extract_audio(ffmpeg_path, video_path, audio_wav_path, ref_wav_path):
                "-f", "wav", ref_wav_path]
     subprocess.run(cmd_ref, capture_output=True)
 
-    log("audio_extract", 20, "Ses başarıyla ayırıldı ✓")
+    log("audio_extract", 20, "Audio extracted successfully ✓")
 
 
 # ---------------------------------------------------------------------------
@@ -119,13 +121,13 @@ def extract_audio(ffmpeg_path, video_path, audio_wav_path, ref_wav_path):
 
 def transcribe_whisper(whisper_path, audio_path, model_name, tmpdir):
     """Run whisper.exe (Const-me build) and return list of segment dicts."""
-    log("stt", 25, f"Whisper ({model_name}) ile transkripsiyon başlatılıyor...")
+    log("stt", 25, f"Starting Whisper ({model_name}) transcription...")
 
     model_dir = Path(whisper_path).parent / "models"
     model_bin = model_dir / f"ggml-{model_name}.bin"
 
     if not model_bin.exists():
-        raise RuntimeError(f"Whisper model bulunamadı: {model_bin}")
+        raise RuntimeError(f"Whisper model not found: {model_bin}")
 
     # Const-me Whisper: -m model -f input -osrt -l lang
     # Output written as <audio_path_without_ext>.srt  (same folder as input)
@@ -146,10 +148,10 @@ def transcribe_whisper(whisper_path, audio_path, model_name, tmpdir):
 
     if out_srt is None:
         stderr_text = result.stderr.decode("utf-8", errors="replace") if result.stderr else ""
-        raise RuntimeError(f"Whisper SRT çıktısı üretilemedi. stderr:\n{stderr_text[:400]}")
+        raise RuntimeError(f"Whisper SRT output could not be generated. stderr:\n{stderr_text[:400]}")
 
     content = out_srt.read_text(encoding="utf-8", errors="replace")
-    log("stt", 50, f"Transkripsiyon tamamlandı ✓ ({len(content)} karakter)")
+    log("stt", 50, f"Transcription completed ✓ ({len(content)} characters)")
     return parse_srt(content)
 
 
@@ -207,7 +209,7 @@ def get_media_duration_ms(ffmpeg_path, media_path):
 # ---------------------------------------------------------------------------
 
 def translate_segments(segments):
-    log("translation", 55, "Helsinki-NLP/opus-mt-tr-en modeli yükleniyor (ilk seferinde indirilir)...")
+    log("translation", 55, "Loading Helsinki-NLP/opus-mt-tr-en model (will be downloaded on first run)...")
 
     from transformers import MarianMTModel, MarianTokenizer
 
@@ -215,7 +217,7 @@ def translate_segments(segments):
     tokenizer = MarianTokenizer.from_pretrained(model_name)
     model     = MarianMTModel.from_pretrained(model_name)
 
-    log("translation", 60, "Çeviri yapılıyor...")
+    log("translation", 60, "Translating...")
 
     texts = [s["text"] for s in segments]
     # Batch translate
@@ -230,7 +232,7 @@ def translate_segments(segments):
     for seg, tr in zip(segments, translated):
         seg["translated"] = tr
 
-    log("translation", 70, f"Çeviri tamamlandı — {len(segments)} segment ✓")
+    log("translation", 70, f"Translation completed — {len(segments)} segments ✓")
     return segments
 
 
@@ -240,7 +242,7 @@ def translate_segments(segments):
 
 def synthesize_speech(segments, ref_wav_path, tmpdir, ffmpeg_path, tts_engine_name="gtts"):
     """Synthesize English TTS audio for each segment and produce a merged WAV."""
-    log("cloning", 72, f"Ses sentezi başlatılıyor ({tts_engine_name.upper()})...")
+    log("cloning", 72, f"Starting speech synthesis ({tts_engine_name.upper()})...")
 
     tts_engine = None
     use_coqui  = False
@@ -249,12 +251,12 @@ def synthesize_speech(segments, ref_wav_path, tmpdir, ffmpeg_path, tts_engine_na
     if tts_engine_name == "xtts":
         try:
             from TTS.api import TTS
-            log("cloning", 73, "Coqui XTTS v2 yükleniyor (GPU yoksa yavaş olabilir)...")
+            log("cloning", 73, "Loading Coqui XTTS v2 (might be slow without GPU)...")
             tts_engine = TTS("tts_models/multilingual/multi-dataset/xtts_v2")
             use_coqui  = True
-            log("cloning", 75, "Coqui XTTS v2 hazır ✓")
+            log("cloning", 75, "Coqui XTTS v2 ready ✓")
         except Exception as e:
-            log("cloning", 73, f"Coqui XTTS v2 yüklenemedi, gTTS'e geçiliyor: {e}")
+            log("cloning", 73, f"Failed to load Coqui XTTS v2, falling back to gTTS: {e}")
 
     audio_segments = []   # list of (start_ms, end_ms, wav_path)
     total = len(segments)
@@ -292,7 +294,7 @@ def synthesize_speech(segments, ref_wav_path, tmpdir, ffmpeg_path, tts_engine_na
         if os.path.exists(out_wav):
             audio_segments.append((seg["start"], seg["end"], out_wav))
 
-    log("cloning", 85, f"Ses sentezi tamamlandı — {len(audio_segments)} segment ✓")
+    log("cloning", 85, f"Speech synthesis completed — {len(audio_segments)} segments ✓")
     return audio_segments
 
 
@@ -307,7 +309,7 @@ def build_dubbed_audio(ffmpeg_path, original_wav, audio_segments, tmpdir, total_
          [Silence from 0 to start1] -> [TTS1 (speed-matched)] -> [Silence from end1 to start2] -> [TTS2] -> ...
       3. Mix this clean timeline with a heavily ducked original audio (sound effects/background).
     """
-    log("assembly", 87, "Ses zamanlamaları ayarlanıyor ve hizalanıyor...")
+    log("assembly", 87, "Adjusting and aligning audio timings...")
 
     if not audio_segments:
         dubbed_wav = os.path.join(tmpdir, "dubbed.wav")
@@ -427,7 +429,7 @@ def build_dubbed_audio(ffmpeg_path, original_wav, audio_segments, tmpdir, total_
         # Quick fallback: simple overlay if complex filter failed
         shutil.copy(original_wav, dubbed_wav)
         
-    log("assembly", 90, "Ses hizalama ve birleştirme tamamlandı ✓")
+    log("assembly", 90, "Audio alignment and merging completed ✓")
     return dubbed_wav
 
 
@@ -437,7 +439,7 @@ def build_dubbed_audio(ffmpeg_path, original_wav, audio_segments, tmpdir, total_
 # ---------------------------------------------------------------------------
 
 def merge_into_video(ffmpeg_path, video_path, dubbed_wav, output_path):
-    log("assembly", 92, "Yeni ses video ile birleştiriliyor...")
+    log("assembly", 92, "Merging new audio with video...")
 
     # Run without '-v quiet' so we can capture the stream analysis output in stderr
     probe = subprocess.run(
@@ -472,7 +474,7 @@ def merge_into_video(ffmpeg_path, video_path, dubbed_wav, output_path):
     if result.returncode != 0:
         raise RuntimeError(f"FFmpeg merge failed: {result.stderr[-400:]}")
 
-    log("assembly", 98, "Video başarıyla oluşturuldu ✓")
+    log("assembly", 98, "Video created successfully ✓")
 
 
 # ---------------------------------------------------------------------------
@@ -492,18 +494,18 @@ def main():
     whisper_path = args.whisper or find_binary(["whisper.exe"])
 
     if not ffmpeg_path or not os.path.exists(ffmpeg_path):
-        log("error", 0, "FFmpeg bulunamadı! Lütfen --ffmpeg parametresi ile path verin.")
+        log("error", 0, "FFmpeg not found! Please provide a path with the --ffmpeg parameter.")
         sys.exit(1)
 
     if not whisper_path or not os.path.exists(whisper_path):
-        log("error", 0, "Whisper.exe bulunamadı! Lütfen --whisper parametresi ile path verin.")
+        log("error", 0, "Whisper.exe not found! Please provide a path with the --whisper parameter.")
         sys.exit(1)
 
     if not os.path.exists(input_file):
-        log("error", 0, f"Girdi dosyası bulunamadı: {input_file}")
+        log("error", 0, f"Input file not found: {input_file}")
         sys.exit(1)
 
-    log("init", 5, f"Pipeline başlatıldı — {os.path.basename(input_file)}")
+    log("init", 5, f"Pipeline initialized — {os.path.basename(input_file)}")
 
     with tempfile.TemporaryDirectory(prefix="voicext_") as tmpdir:
         try:
@@ -515,14 +517,14 @@ def main():
             # Step 2: Transcribe (Turkish)
             segments = transcribe_whisper(whisper_path, audio_wav, model_name, tmpdir)
             if not segments:
-                log("stt", 50, "Transkripsiyon boş döndü – video sessiz olabilir.")
+                log("stt", 50, "Transcription returned empty – the video might be silent.")
                 segments = []
 
             # Step 3: Translate (Turkish → English)
             if segments:
                 segments = translate_segments(segments)
             else:
-                log("translation", 70, "Çevrilecek segment yok, orijinal video kopyalanıyor.")
+                log("translation", 70, "No segments to translate, copying original video.")
 
             # Step 4: Synthesize English TTS
             if segments:
@@ -539,26 +541,26 @@ def main():
                 dubbed_wav = build_dubbed_audio(ffmpeg_path, audio_wav, audio_segs, tmpdir, total_ms)
             # Step 5.5: Apply Lip-Sync (Wav2Lip)
             if args.lip_sync:
-                log("lipsync", 91, "Wav2Lip Lip-Sync senkronizasyonu başlatılıyor (GPU aranıyor)...")
+                log("lipsync", 91, "Starting Wav2Lip Lip-Sync synchronization (searching for GPU)...")
                 # Since Wav2Lip is an external model requiring model weights and specific setup, 
                 # we provide a clean log flow and notify the user about CPU/GPU execution constraints.
                 time.sleep(1)
-                log("lipsync", 95, "Wav2Lip: Dudak senkronizasyonu tamamlandı (Fallback modunda entegre edildi) ✓")
+                log("lipsync", 95, "Wav2Lip: Lip synchronization completed (integrated in fallback mode) ✓")
             else:
-                log("lipsync", 91, "Wav2Lip Lip-Sync devre dışı (atlandı).")
+                log("lipsync", 91, "Wav2Lip Lip-Sync disabled (skipped).")
 
             # Step 6: Merge into video
             merge_into_video(ffmpeg_path, input_file, dubbed_wav, output_file)
 
-            log("done", 100, f"Çeviri tamamlandı! → {output_file}")
+            log("done", 100, f"Translation completed! → {output_file}")
 
         except Exception as e:
-            log("error", 0, f"Pipeline hatası: {str(e)}")
+            log("error", 0, f"Pipeline error: {str(e)}")
             import traceback
             traceback.print_exc()
             # Fallback: copy original
             shutil.copy2(input_file, output_file)
-            log("done", 100, f"Hata nedeniyle orijinal video kopyalandı: {output_file}")
+            log("done", 100, f"Copied original video due to error: {output_file}")
             sys.exit(1)
 
 

@@ -14,7 +14,10 @@ const api = {
   readSrt: (filePath) => ipcRenderer.invoke('read-srt', filePath),
   saveSrt: (filePath, content) => ipcRenderer.invoke('save-srt', { filePath, content }),
   selectFile: (filters) => ipcRenderer.invoke('select-file', filters),
-  optimizeSrt: (filePath) => ipcRenderer.invoke('optimize-srt', filePath)
+  optimizeSrt: (filePath) => ipcRenderer.invoke('optimize-srt', filePath),
+  getModelsStatus: () => ipcRenderer.invoke('get-models-status'),
+  downloadModel: (model) => ipcRenderer.invoke('download-model', model),
+  onModelDownloadProgress: (callback) => ipcRenderer.on('model-download-progress', (_, data) => callback(data))
 }
 
 if (process.contextIsolated) {
