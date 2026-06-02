@@ -29,5 +29,6 @@ nsis:
 
 publish:
   provider: github
-  owner: truncgil
+  v3ApiUrl: https://git.truncgil.com/api/v1
+  owner: truncgit
   repo: voicext
