@@ -98,6 +98,10 @@ function createWindow() {
     shell.showItemInFolder(path)
   })
 
+  ipcMain.on('open-file', (event, path) => {
+    shell.openPath(path)
+  })
+
   // Handle SRT Reading
   ipcMain.handle('read-srt', async (event, filePath) => {
     try {

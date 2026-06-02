@@ -345,6 +345,9 @@ function createWindow() {
   electron.ipcMain.on("open-explorer", (event, path2) => {
     electron.shell.showItemInFolder(path2);
   });
+  electron.ipcMain.on("open-file", (event, path2) => {
+    electron.shell.openPath(path2);
+  });
   electron.ipcMain.handle("read-srt", async (event, filePath) => {
     try {
       const content = fs.readFileSync(filePath, "utf-8");

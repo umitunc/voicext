@@ -10,6 +10,7 @@ const api = {
   onTranslationStatus: (callback) => ipcRenderer.on('translation-status', (_, status) => callback(status)),
   detectHardware: () => ipcRenderer.invoke('detect-hardware'),
   openExplorer: (path) => ipcRenderer.send('open-explorer', path),
+  openFile: (path) => ipcRenderer.send('open-file', path),
   readSrt: (filePath) => ipcRenderer.invoke('read-srt', filePath),
   saveSrt: (filePath, content) => ipcRenderer.invoke('save-srt', { filePath, content }),
   selectFile: (filters) => ipcRenderer.invoke('select-file', filters),

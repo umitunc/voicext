@@ -1,11 +1,11 @@
 import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle2, FolderOpen, X, FileEdit } from 'lucide-react'
+import { CheckCircle2, Play, X, FileEdit } from 'lucide-react'
 
 export default function ResultModal({ isOpen, path, onClose, onEdit }) {
-  const handleOpenFolder = () => {
-    if (window.api && window.api.openExplorer) {
-      window.api.openExplorer(path)
+  const handleOpenFile = () => {
+    if (window.api && window.api.openFile) {
+      window.api.openFile(path)
     }
   }
 
@@ -29,8 +29,8 @@ export default function ResultModal({ isOpen, path, onClose, onEdit }) {
                 <CheckCircle2 size={64} className="text-primary-cyan" />
               </div>
               
-              <h2>Transcription Complete!</h2>
-              <p className="modal-subtitle">Your subtitle file is ready for use.</p>
+              <h2>Complete!</h2>
+              <p className="modal-subtitle">Your output file is ready.</p>
               
               <div className="path-container glass">
                 <div className="path-label">OUTPUT PATH:</div>
@@ -41,9 +41,9 @@ export default function ResultModal({ isOpen, path, onClose, onEdit }) {
                 <button className="btn-secondary" onClick={onClose}>
                   CLOSE
                 </button>
-                <button className="btn-primary-small" onClick={handleOpenFolder}>
-                  <FolderOpen size={18} />
-                  OPEN FOLDER
+                <button className="btn-primary-small" onClick={handleOpenFile}>
+                  <Play size={18} />
+                  OPEN FILE
                 </button>
                 {path && path.toLowerCase().endsWith('.srt') && (
                   <button className="btn-primary-small" onClick={() => { onEdit(path); onClose(); }}>

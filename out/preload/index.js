@@ -10,6 +10,7 @@ const api = {
   onTranslationStatus: (callback) => electron.ipcRenderer.on("translation-status", (_, status) => callback(status)),
   detectHardware: () => electron.ipcRenderer.invoke("detect-hardware"),
   openExplorer: (path) => electron.ipcRenderer.send("open-explorer", path),
+  openFile: (path) => electron.ipcRenderer.send("open-file", path),
   readSrt: (filePath) => electron.ipcRenderer.invoke("read-srt", filePath),
   saveSrt: (filePath, content) => electron.ipcRenderer.invoke("save-srt", { filePath, content }),
   selectFile: (filters) => electron.ipcRenderer.invoke("select-file", filters),
