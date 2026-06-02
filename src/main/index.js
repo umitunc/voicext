@@ -5,6 +5,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
 import { detectHardware, transcribe, fixSrt } from './engine/transcription'
+import { translateVideo } from './engine/translation_service'
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -36,6 +37,25 @@ function createWindow() {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  // Handle Video Translation
+  ipcMain.handle('start-video-translation', async (event, { filePath, options }) => {
+    try {
+      const result = await translateVideo(
+        filePath,
+        options,
+        (status) => {
+          if (!mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('translation-status', status)
+          }
+        }
+      )
+      return result
+    } catch (error) {
+      console.error('Video Translation Error:', error)
+      throw error
+    }
+  })
 
   // Handle transcription request
   ipcMain.handle('start-transcription', async (event, { filePath, options }) => {

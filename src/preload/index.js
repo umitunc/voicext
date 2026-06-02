@@ -6,6 +6,8 @@ const api = {
   startTranscription: (filePath, options) => ipcRenderer.invoke('start-transcription', { filePath, options }),
   onTranscriptionProgress: (callback) => ipcRenderer.on('transcription-progress', (_, progress) => callback(progress)),
   onTranscriptionData: (callback) => ipcRenderer.on('transcription-data', (_, data) => callback(data)),
+  startVideoTranslation: (filePath, options) => ipcRenderer.invoke('start-video-translation', { filePath, options }),
+  onTranslationStatus: (callback) => ipcRenderer.on('translation-status', (_, status) => callback(status)),
   detectHardware: () => ipcRenderer.invoke('detect-hardware'),
   openExplorer: (path) => ipcRenderer.send('open-explorer', path),
   readSrt: (filePath) => ipcRenderer.invoke('read-srt', filePath),

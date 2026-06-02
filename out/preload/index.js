@@ -6,6 +6,8 @@ const api = {
   startTranscription: (filePath, options) => electron.ipcRenderer.invoke("start-transcription", { filePath, options }),
   onTranscriptionProgress: (callback) => electron.ipcRenderer.on("transcription-progress", (_, progress) => callback(progress)),
   onTranscriptionData: (callback) => electron.ipcRenderer.on("transcription-data", (_, data) => callback(data)),
+  startVideoTranslation: (filePath, options) => electron.ipcRenderer.invoke("start-video-translation", { filePath, options }),
+  onTranslationStatus: (callback) => electron.ipcRenderer.on("translation-status", (_, status) => callback(status)),
   detectHardware: () => electron.ipcRenderer.invoke("detect-hardware"),
   openExplorer: (path) => electron.ipcRenderer.send("open-explorer", path),
   readSrt: (filePath) => electron.ipcRenderer.invoke("read-srt", filePath),

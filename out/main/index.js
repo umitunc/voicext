@@ -170,6 +170,55 @@ ${stderrOutput}`));
     });
   });
 }
+function translateVideo(videoPath, options, onStatus) {
+  return new Promise((resolve, reject) => {
+    const { lipSync = false } = options;
+    const ext = path.extname(videoPath);
+    const baseDir = path.dirname(videoPath);
+    const baseName = path.basename(videoPath, ext);
+    const outputPath = path.join(baseDir, `${baseName}_translated${ext || ".mp4"}`);
+    const pythonScript = electron.app.isPackaged ? path.join(process.resourcesPath, "scratch", "cloning_pipeline.py") : path.join(electron.app.getAppPath(), "scratch", "cloning_pipeline.py");
+    const pythonCmd = process.platform === "win32" ? "python" : "python3";
+    const args = ["-u", pythonScript, "--input", videoPath, "--output", outputPath];
+    if (lipSync) {
+      args.push("--lip_sync");
+    }
+    console.log("[Voicext Service] Starting translation pipeline:", pythonCmd, args.join(" "));
+    const pyProcess = child_process.spawn(pythonCmd, args);
+    let stderrOutput = "";
+    pyProcess.stdout.on("data", (data) => {
+      const output = data.toString().trim();
+      const lines = output.split("\n");
+      for (const line of lines) {
+        if (!line) continue;
+        try {
+          const status = JSON.parse(line);
+          onStatus(status);
+        } catch (e) {
+          console.log("[Python stdout]", line);
+        }
+      }
+    });
+    pyProcess.stderr.on("data", (data) => {
+      const text = data.toString();
+      stderrOutput += text;
+      console.log("[Python stderr]", text);
+    });
+    pyProcess.on("error", (err) => {
+      console.error("[Voicext Service] Failed to start Python process:", err);
+      reject(new Error(`Failed to start translation engine. Make sure Python is installed and added to PATH.`));
+    });
+    pyProcess.on("close", (code) => {
+      console.log(`[Voicext Service] Translation pipeline exited with code: ${code}`);
+      if (code === 0) {
+        resolve({ success: true, outputPath });
+      } else {
+        reject(new Error(`Translation pipeline failed with exit code ${code}. Details:
+${stderrOutput}`));
+      }
+    });
+  });
+}
 function createWindow() {
   const mainWindow = new electron.BrowserWindow({
     width: 1100,
@@ -197,6 +246,23 @@ function createWindow() {
   } else {
     mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
   }
+  electron.ipcMain.handle("start-video-translation", async (event, { filePath, options }) => {
+    try {
+      const result = await translateVideo(
+        filePath,
+        options,
+        (status) => {
+          if (!mainWindow.isDestroyed()) {
+            mainWindow.webContents.send("translation-status", status);
+          }
+        }
+      );
+      return result;
+    } catch (error) {
+      console.error("Video Translation Error:", error);
+      throw error;
+    }
+  });
   electron.ipcMain.handle("start-transcription", async (event, { filePath, options }) => {
     try {
       const result = await transcribe(
