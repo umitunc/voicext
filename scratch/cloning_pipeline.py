@@ -268,12 +268,28 @@ def synthesize_speech(segments, ref_wav_path, tmpdir, ffmpeg_path, tts_engine_na
         log("cloning", progress, f"Segment {idx+1}/{total}: {text[:60]}...")
 
         if use_coqui:
-            tts_engine.tts_to_file(
-                text=text,
-                speaker_wav=ref_wav_path if os.path.exists(ref_wav_path) else None,
-                language="en",
-                file_path=out_wav
-            )
+            try:
+                tts_engine.tts_to_file(
+                    text=text,
+                    speaker_wav=ref_wav_path if os.path.exists(ref_wav_path) else None,
+                    language="en",
+                    file_path=out_wav
+                )
+            except Exception as coqui_err:
+                log("cloning", progress, f"Coqui XTTS failed on segment {idx+1}: {coqui_err}. Falling back to gTTS.")
+                try:
+                    from gtts import gTTS
+                    gTTS(text=text, lang="en").save(out_wav)
+                except Exception:
+                    try:
+                        import pyttsx3
+                        engine = pyttsx3.init()
+                        engine.setProperty("rate", 175)
+                        engine.save_to_file(text, out_wav)
+                        engine.runAndWait()
+                    except Exception as e2:
+                        log("cloning", progress, f"TTS failed for segment {idx}: {e2}")
+                        continue
         else:
             # Fallback: gTTS
             try:

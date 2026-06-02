@@ -45,6 +45,11 @@ const formats = [
   { id: 'txt', name: '.TXT (Plain Text)' }
 ]
 
+const ttsEngines = [
+  { id: 'xtts', name: 'Coqui XTTS v2 (Voice Clone - CPU/GPU)' },
+  { id: 'gtts', name: 'gTTS (Fast Fallback - Offline)' }
+]
+
 function App() {
   const [activeTab, setActiveTab] = useState('srt')
   const [dragActive, setDragActive] = useState(false)
@@ -475,7 +480,7 @@ function App() {
                         { key: 'audio_extract', name: 'Extract Audio & 3s Reference Track', icon: '🎙️' },
                         { key: 'stt', name: 'Local speech-to-text transcription', icon: '📝' },
                         { key: 'translation', name: 'Translate Turkish to English (Marian-MT)', icon: '🌐' },
-                        { key: 'cloning', name: 'Voice cloning speech synthesis (XTTS v2)', icon: '👥' },
+                        { key: 'cloning', name: translationConfig.ttsModel === 'xtts' ? 'Voice cloning speech synthesis (XTTS v2)' : 'Fast speech synthesis (gTTS)', icon: '👥' },
                         { key: 'lipsync', name: 'Synchronize & Apply Lip-Sync (Wav2Lip)', icon: '💋' },
                         { key: 'assembly', name: 'Final Video Multiplex & Assembly', icon: '🎬' }
                       ].map((step, idx) => (
@@ -539,12 +544,19 @@ function App() {
                     </div>
                   </div>
 
-                  <div className="input-group">
-                    <label>Voice Cloning Engine:</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', padding: '10px 14px', borderRadius: '10px', fontSize: '13px' }}>
-                      <span style={{ color: 'var(--primary-magenta)', fontWeight: 'bold' }}>Coqui XTTS v2 (Local)</span>
-                    </div>
-                  </div>
+                  <CustomSelect
+                    label="Whisper Model:"
+                    options={models}
+                    value={translationConfig.whisperModel}
+                    onChange={(val) => setTranslationConfig({ ...translationConfig, whisperModel: val })}
+                  />
+
+                  <CustomSelect
+                    label="TTS Engine / Voice:"
+                    options={ttsEngines}
+                    value={translationConfig.ttsModel}
+                    onChange={(val) => setTranslationConfig({ ...translationConfig, ttsModel: val })}
+                  />
 
                   <div className="toggle-switch-container" onClick={() => setTranslationConfig({ ...translationConfig, lipSync: !translationConfig.lipSync })}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
