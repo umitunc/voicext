@@ -59,29 +59,61 @@ def radial_background(size: tuple[int, int]) -> Image.Image:
     return Image.alpha_composite(img, glow)
 
 
-def paste_centered(canvas: Image.Image, asset: Image.Image, y_ratio: float, scale: float) -> None:
-    target = int(min(canvas.width, canvas.height) * scale)
+def resize_asset(asset: Image.Image, target: int) -> Image.Image:
     ratio = target / max(asset.width, asset.height)
     new_size = (max(1, int(asset.width * ratio)), max(1, int(asset.height * ratio)))
-    resized = asset.resize(new_size, Image.Resampling.LANCZOS)
+    return asset.resize(new_size, Image.Resampling.LANCZOS)
+
+
+def paste_centered(canvas: Image.Image, asset: Image.Image, y_ratio: float, scale: float) -> None:
+    target = int(min(canvas.width, canvas.height) * scale)
+    resized = resize_asset(asset, target)
     x = (canvas.width - resized.width) // 2
     y = int(canvas.height * y_ratio) - resized.height // 2
     canvas.alpha_composite(resized, (x, y))
 
 
+def paste_at(
+    canvas: Image.Image,
+    asset: Image.Image,
+    x_ratio: float,
+    y_ratio: float,
+    scale: float,
+    *,
+    anchor: str = "center",
+) -> None:
+    target = int(min(canvas.width, canvas.height) * scale)
+    resized = resize_asset(asset, target)
+    if anchor == "center":
+        x = int(canvas.width * x_ratio) - resized.width // 2
+        y = int(canvas.height * y_ratio) - resized.height // 2
+    else:
+        x = int(canvas.width * x_ratio)
+        y = int(canvas.height * y_ratio)
+    canvas.alpha_composite(resized, (x, y))
+
+
+def load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    font_name = "segoeuib.ttf" if bold else "segoeui.ttf"
+    try:
+        return ImageFont.truetype(f"C:/Windows/Fonts/{font_name}", size)
+    except OSError:
+        return ImageFont.load_default()
+
+
 def logo_text_only(logo: Image.Image) -> Image.Image:
-    # Split the horizontal lockup after the icon by finding the text column gap.
+    # Keep the wordmark by trimming only the icon on the left side.
     alpha = logo.split()[-1]
     width, height = logo.size
-    icon_end = int(width * 0.34)
+    icon_right = 0
 
-    for x in range(icon_end, int(width * 0.5)):
-        column = [alpha.getpixel((x, y)) for y in range(height // 4, height * 3 // 4, 8)]
-        if max(column) < 12:
-            icon_end = x
-            break
+    for x in range(int(width * 0.48)):
+        column = [alpha.getpixel((x, y)) for y in range(0, height, 6)]
+        if max(column) > 20:
+            icon_right = x
 
-    return logo.crop((icon_end, 0, width, height))
+    left = min(icon_right + int(width * 0.015), int(width * 0.36))
+    return logo.crop((left, 0, width, height))
 
 
 def create_square_icon(size: int) -> Image.Image:
@@ -105,6 +137,16 @@ def create_box_art(size: int) -> Image.Image:
     return canvas
 
 
+def draw_footer_tagline(canvas: Image.Image, text: str, y_ratio: float = 0.86) -> None:
+    draw = ImageDraw.Draw(canvas)
+    font = load_font(max(14, canvas.height // 38))
+    bbox = draw.textbbox((0, 0), text, font=font)
+    text_w = bbox[2] - bbox[0]
+    text_x = (canvas.width - text_w) // 2
+    text_y = int(canvas.height * y_ratio)
+    draw.text((text_x, text_y), text, fill=(160, 210, 220, 220), font=font)
+
+
 def create_poster_art(width: int, height: int) -> Image.Image:
     icon = Image.open(ICON_PATH).convert("RGBA")
     text = logo_text_only(Image.open(LOGO_PATH).convert("RGBA"))
@@ -112,20 +154,60 @@ def create_poster_art(width: int, height: int) -> Image.Image:
 
     paste_centered(canvas, icon, 0.36, 0.38)
     paste_centered(canvas, text, 0.58, 0.72)
+    draw_footer_tagline(canvas, "Yerel AI ile sesi metne dönüştürün")
+    return canvas
+
+
+def create_super_hero_art(width: int, height: int) -> Image.Image:
+    icon = Image.open(ICON_PATH).convert("RGBA")
+    text = logo_text_only(Image.open(LOGO_PATH).convert("RGBA"))
+    canvas = radial_background((width, height))
+
+    paste_at(canvas, icon, 0.28, 0.46, 0.52)
+    paste_at(canvas, text, 0.62, 0.42, 0.62)
 
     draw = ImageDraw.Draw(canvas)
-    font_size = max(14, height // 38)
-    try:
-        font = ImageFont.truetype("C:/Windows/Fonts/segoeui.ttf", font_size)
-    except OSError:
-        font = ImageFont.load_default()
+    features = [
+        "Whisper AI ile yerel transkripsiyon",
+        "GPU hızlandırmalı · Tamamen çevrimdışı",
+    ]
+    font = load_font(max(16, height // 28))
+    y = int(height * 0.72)
+    for line in features:
+        draw.text((int(width * 0.46), y), line, fill=(170, 200, 215, 210), font=font)
+        y += int(height * 0.07)
+    return canvas
 
-    subtitle = "Yerel AI ile sesi metne dönüştürün"
-    bbox = draw.textbbox((0, 0), subtitle, font=font)
-    text_w = bbox[2] - bbox[0]
-    text_x = (width - text_w) // 2
-    text_y = int(height * 0.86)
-    draw.text((text_x, text_y), subtitle, fill=(160, 210, 220, 220), font=font)
+
+def create_titled_hero_art(width: int, height: int) -> Image.Image:
+    icon = Image.open(ICON_PATH).convert("RGBA")
+    text = logo_text_only(Image.open(LOGO_PATH).convert("RGBA"))
+    canvas = radial_background((width, height))
+
+    paste_at(canvas, icon, 0.5, 0.34, 0.34)
+    paste_at(canvas, text, 0.5, 0.62, 0.58)
+    draw_footer_tagline(canvas, "Yerel AI ile sesi metne dönüştürün", y_ratio=0.84)
+    return canvas
+
+
+def create_branded_key_art(width: int, height: int) -> Image.Image:
+    icon = Image.open(ICON_PATH).convert("RGBA")
+    text = logo_text_only(Image.open(LOGO_PATH).convert("RGBA"))
+    canvas = radial_background((width, height))
+
+    paste_centered(canvas, icon, 0.34, 0.36)
+    paste_centered(canvas, text, 0.56, 0.58)
+    draw_footer_tagline(canvas, "Yerel AI ile sesi metne dönüştürün", y_ratio=0.88)
+    return canvas
+
+
+def create_featured_promo_square(size: int) -> Image.Image:
+    icon = Image.open(ICON_PATH).convert("RGBA")
+    text = logo_text_only(Image.open(LOGO_PATH).convert("RGBA"))
+    canvas = radial_background((size, size))
+
+    paste_centered(canvas, icon, 0.38, 0.34)
+    paste_centered(canvas, text, 0.66, 0.58)
     return canvas
 
 
@@ -144,6 +226,11 @@ def main() -> None:
         "store-logos/box-art-2160x2160.png": create_box_art(2160),
         "store-logos/poster-art-720x1080.png": create_poster_art(720, 1080),
         "store-logos/poster-art-1440x2160.png": create_poster_art(1440, 2160),
+        "promotional/super-hero-art-1920x1080.png": create_super_hero_art(1920, 1080),
+        "promotional/super-hero-art-3840x2160.png": create_super_hero_art(3840, 2160),
+        "promotional/titled-hero-art-1920x1080.png": create_titled_hero_art(1920, 1080),
+        "promotional/branded-key-art-584x800.png": create_branded_key_art(584, 800),
+        "promotional/featured-promo-square-1080x1080.png": create_featured_promo_square(1080),
     }
 
     for relative_path, image in assets.items():
