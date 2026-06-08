@@ -3,23 +3,34 @@ import https from 'https'
 import fs from 'fs'
 import path from 'path'
 
-const BIN_PATH = app.isPackaged
-  ? path.join(process.resourcesPath, 'bin')
-  : path.join(app.getAppPath(), 'bin')
+const DEV_MODELS_DIR = path.join(app.getAppPath(), 'bin', 'models')
 
-const modelsDir = path.join(BIN_PATH, 'models')
+export function getModelsDir() {
+  if (!app.isPackaged) return DEV_MODELS_DIR
+  return path.join(app.getPath('userData'), 'models')
+}
+
+function resolveModelPath(model) {
+  const userModel = path.join(getModelsDir(), `ggml-${model}.bin`)
+  if (fs.existsSync(userModel)) return userModel
+  if (!app.isPackaged) {
+    const devModel = path.join(DEV_MODELS_DIR, `ggml-${model}.bin`)
+    if (fs.existsSync(devModel)) return devModel
+  }
+  return userModel
+}
 
 export function getModelsStatus() {
   const models = ['base', 'small', 'medium', 'large']
   const status = {}
-  
+  const modelsDir = getModelsDir()
+
   if (!fs.existsSync(modelsDir)) {
     fs.mkdirSync(modelsDir, { recursive: true })
   }
-  
+
   for (const m of models) {
-    const p = path.join(modelsDir, `ggml-${m}.bin`)
-    status[m] = fs.existsSync(p)
+    status[m] = fs.existsSync(resolveModelPath(m))
   }
   return status
 }
@@ -39,6 +50,7 @@ export function downloadModel(mainWindow, model) {
       return reject(new Error(`Unknown model: ${model}`))
     }
 
+    const modelsDir = getModelsDir()
     if (!fs.existsSync(modelsDir)) {
       fs.mkdirSync(modelsDir, { recursive: true })
     }

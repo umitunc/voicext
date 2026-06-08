@@ -1,6 +1,6 @@
 {
   "name": "voicext",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "productName": "VoiceXt",
   "description": "High Performance Local AI Transcription Tool",
   "main": "./out/main/index.js",
@@ -8,9 +8,11 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
+    "build:win": "npm version patch --no-git-tag-version && electron-vite build && electron-builder --win",
     "preview": "electron-vite preview",
     "package": "electron-vite build && electron-builder",
-    "release": "electron-vite build && electron-builder --publish always",
+    "package:store": "npm version patch --no-git-tag-version && electron-vite build && electron-builder --win appx",
+    "release": "npm version patch --no-git-tag-version && electron-vite build && electron-builder --publish always",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
@@ -34,5 +36,66 @@
     "electron-builder": "^26.8.1",
     "electron-vite": "^2.3.0",
     "vite": "^5.3.1"
+  },
+  "build": {
+    "appId": "com.voicext.app",
+    "productName": "VoiceXt",
+    "asar": true,
+    "directories": {
+      "output": "out/make",
+      "buildResources": "build"
+    },
+    "files": [
+      "out/main/index.js",
+      "out/preload/index.js",
+      "out/renderer/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "bin",
+        "to": "bin",
+        "filter": [
+          "**/*",
+          "!models/**/*"
+        ]
+      },
+      {
+        "from": "scratch",
+        "to": "scratch",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "appx"
+      ],
+      "icon": "resources/icon.png",
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "appx": {
+      "identityName": "TruncgilTeknoloji.VoiceXT",
+      "publisher": "CN=36E5CC36-2B19-4151-A2CF-66EF42CB6EBD",
+      "publisherDisplayName": "Truncgil Teknoloji",
+      "applicationId": "VoiceXT",
+      "languages": [
+        "tr-TR",
+        "en-US"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "VoiceXt",
+      "createDesktopShortcut": true
+    },
+    "publish": {
+      "provider": "generic",
+      "url": "https://git.truncgil.com/truncgit/voicext"
+    }
   }
 }

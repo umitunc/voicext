@@ -2,7 +2,7 @@ appId: com.voicext.app
 productName: VoiceXt
 directories:
   output: out/make
-  buildResources: resources
+  buildResources: build
 
 files:
   - out/main/index.js
@@ -22,10 +22,21 @@ extraResources:
       - "**/*"
 
 win:
-  target: nsis
+  target:
+    - nsis
+    - appx
   icon: resources/icon.png
-  artifactName: "${productName}-Setup-${version}.${ext}"
-  requestedExecutionLevel: requireAdministrator
+  artifactName: "${productName}-${version}-${arch}.${ext}"
+  requestedExecutionLevel: asInvoker
+
+appx:
+  identityName: TruncgilTeknoloji.VoiceXT
+  publisher: CN=36E5CC36-2B19-4151-A2CF-66EF42CB6EBD
+  publisherDisplayName: Truncgil Teknoloji
+  applicationId: VoiceXT
+  languages:
+    - tr-TR
+    - en-US
 
 nsis:
   oneClick: false
@@ -34,7 +45,5 @@ nsis:
   createDesktopShortcut: true
 
 publish:
-  provider: github
-  v3ApiUrl: https://git.truncgil.com/api/v1
-  owner: truncgit
-  repo: voicext
+  provider: generic
+  url: https://git.truncgil.com/truncgit/voicext

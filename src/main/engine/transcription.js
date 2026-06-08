@@ -3,6 +3,7 @@ import path from 'path'
 import fs from 'fs'
 import { app } from 'electron'
 import iconv from 'iconv-lite'
+import { getModelsDir } from './models'
 
 const BIN_PATH = app.isPackaged
   ? path.join(process.resourcesPath, 'bin')
@@ -118,7 +119,7 @@ export function transcribe(filePath, options, onProgress, onData) {
   return new Promise((resolve, reject) => {
     const { model = 'small', language = 'tr', format = 'srt' } = options
     const whisperPath = path.join(BIN_PATH, 'whisper.exe')
-    const modelPath = path.join(BIN_PATH, 'models', `ggml-${model}.bin`)
+    const modelPath = path.join(getModelsDir(), `ggml-${model}.bin`)
 
     if (!fs.existsSync(whisperPath)) {
       return reject(new Error(`Whisper executable not found at: ${whisperPath}`))
