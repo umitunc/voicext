@@ -1,6 +1,6 @@
 {
   "name": "voicext",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "productName": "VoiceXt",
   "description": "High Performance Local AI Transcription Tool",
   "main": "./out/main/index.js",
