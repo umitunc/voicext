@@ -48,6 +48,14 @@ export function translateVideo(videoPath, options, onStatus) {
     const baseName = path.basename(videoPath, ext)
     const outputPath = path.join(baseDir, `${baseName}_translated${ext || '.mp4'}`)
 
+    if (fs.existsSync(outputPath)) {
+      try {
+        fs.unlinkSync(outputPath)
+      } catch (e) {
+        console.warn('[Voicext Service] Could not remove existing output file:', e.message)
+      }
+    }
+
     // Python pipeline script path
     const pythonScript = app.isPackaged
       ? path.join(process.resourcesPath, 'scratch', 'cloning_pipeline.py')
@@ -102,9 +110,6 @@ export function translateVideo(videoPath, options, onStatus) {
     pyProcess.on('close', (code) => {
       console.log(`[Voicext Service] Translation pipeline exited with code: ${code}`)
       if (code === 0 && fs.existsSync(outputPath)) {
-        resolve({ success: true, outputPath })
-      } else if (fs.existsSync(outputPath)) {
-        // Exited non-zero but output exists (fallback copy happened)
         resolve({ success: true, outputPath })
       } else {
         reject(new Error(`Translation pipeline failed (code ${code}).\n${stderrOutput.slice(-600)}`))

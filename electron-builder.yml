@@ -15,11 +15,17 @@ extraResources:
     to: bin
     filter:
       - "**/*"
+      - "!models/**/*"
+  - from: scratch
+    to: scratch
+    filter:
+      - "**/*"
 
 win:
   target: nsis
   icon: resources/icon.png
   artifactName: "${productName}-Setup-${version}.${ext}"
+  requestedExecutionLevel: requireAdministrator
 
 nsis:
   oneClick: false

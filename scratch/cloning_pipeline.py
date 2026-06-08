@@ -555,6 +555,8 @@ def main():
                 if not total_ms:
                     total_ms = segments[-1]["end"] + 2000
                 dubbed_wav = build_dubbed_audio(ffmpeg_path, audio_wav, audio_segs, tmpdir, total_ms)
+            else:
+                dubbed_wav = audio_wav
             # Step 5.5: Apply Lip-Sync (Wav2Lip)
             if args.lip_sync:
                 log("lipsync", 91, "Starting Wav2Lip Lip-Sync synchronization (searching for GPU)...")

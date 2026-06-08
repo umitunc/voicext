@@ -206,6 +206,13 @@ function translateVideo(videoPath, options, onStatus) {
     const baseDir = path.dirname(videoPath);
     const baseName = path.basename(videoPath, ext);
     const outputPath = path.join(baseDir, `${baseName}_translated${ext || ".mp4"}`);
+    if (fs.existsSync(outputPath)) {
+      try {
+        fs.unlinkSync(outputPath);
+      } catch (e) {
+        console.warn("[Voicext Service] Could not remove existing output file:", e.message);
+      }
+    }
     const pythonScript = electron.app.isPackaged ? path.join(process.resourcesPath, "scratch", "cloning_pipeline.py") : path.join(electron.app.getAppPath(), "scratch", "cloning_pipeline.py");
     const ffmpegPath = getFfmpegPath();
     const whisperPath = getWhisperPath();
@@ -258,8 +265,6 @@ ${err.message}`));
     pyProcess.on("close", (code) => {
       console.log(`[Voicext Service] Translation pipeline exited with code: ${code}`);
       if (code === 0 && fs.existsSync(outputPath)) {
-        resolve({ success: true, outputPath });
-      } else if (fs.existsSync(outputPath)) {
         resolve({ success: true, outputPath });
       } else {
         reject(new Error(`Translation pipeline failed (code ${code}).
